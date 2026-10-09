@@ -1,6 +1,6 @@
 # NOT executed in the authoring environment (no Docker daemon): treat as a reviewed starting point.
 # Secrets: only from ../backend/.env and the shell environment — nothing secret lives in this file.
-# Required shell variables: DB_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, LIVEKIT_KEYS, TURN_SECRET,
+# Required shell variables: DB_PASSWORD, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, LIVEKIT_KEYS ("key: secret"), LIVEKIT_API_KEY, LIVEKIT_API_SECRET, TURN_SECRET,
 #                           REVERB_HOST, REVERB_KEY (for the web build)
 x-app: &app
   build: {context: .., dockerfile: infra/Dockerfile}
@@ -60,10 +60,24 @@ services:
     volumes: ["./livekit.yaml:/etc/livekit.yaml:ro"]
     ports: ["7880:7880", "7881:7881", "50000-50100:50000-50100/udp"]
     restart: unless-stopped
+  clamav:                                   # malware scan for uploads (SCAN_PROVIDER=clamav CLAMAV_HOST=clamav); first start downloads signatures
+    image: clamav/clamav:stable
+    volumes: ["clamav:/var/lib/clamav"]
+    restart: unless-stopped
+  egress:                                   # class recording (EGRESS_S3_* must point at the same bucket); needs ≥4 CPU for composite recording
+    image: livekit/egress:latest
+    environment:
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET}
+        ws_url: ws://livekit:7880
+        redis: {address: "redis:6379"}
+    cap_add: [SYS_ADMIN]
+    restart: unless-stopped
   turn:                                     # TURN relay for clients behind strict NAT/firewalls
     image: coturn/coturn:latest
     command: ["-c", "/etc/coturn/turnserver.conf", "--static-auth-secret=${TURN_SECRET:?set TURN_SECRET}", "--external-ip=${TURN_EXTERNAL_IP:-}"]
     volumes: ["./turnserver.conf:/etc/coturn/turnserver.conf:ro"]
     ports: ["3478:3478/udp", "3478:3478/tcp", "49160-49200:49160-49200/udp"]
     restart: unless-stopped
-volumes: {mysql: {}, redis: {}, minio: {}, public: {}}
+volumes: {mysql: {}, redis: {}, minio: {}, public: {}, clamav: {}}

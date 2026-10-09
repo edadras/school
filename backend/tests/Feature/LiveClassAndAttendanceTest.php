@@ -230,6 +230,68 @@ class LiveClassAndAttendanceTest extends TestCase
         $this->as_($this->u1)->postJson("/api/v1/sessions/$id/join")->assertJsonPath('recording', true);                      // joiners are told
     }
 
+    private function liveWithRecording(): int
+    {
+        FakeMediaProvider::$recording = true;
+        $id = $this->makeup();
+        $this->as_($this->admin)->patchJson('/api/v1/school/settings', ['settings' => ['recording.allowed' => true]])->assertOk();
+        $this->as_($this->teacher)->postJson("/api/v1/sessions/$id/start")->assertOk();
+
+        return $id;
+    }
+
+    public function test_recording_without_egress_reports_unconfigured_and_starts_nothing(): void
+    {
+        $id = $this->liveWithRecording();
+        FakeMediaProvider::$recording = false;
+        $this->as_($this->teacher)->putJson("/api/v1/sessions/$id/recording", ['enabled' => true])->assertStatus(503)->assertJsonPath('code', 'recording_unconfigured');
+        $this->assertSame([], array_filter(FakeMediaProvider::$calls, fn ($c) => $c[0] === 'startRecording'));
+        $this->assertSame(0, \App\Models\SessionRecording::withoutGlobalScopes()->count());
+    }
+
+    public function test_recording_lifecycle_start_stop_webhook_and_access_control(): void
+    {
+        $id = $this->liveWithRecording();
+        $this->as_($this->u1)->putJson("/api/v1/sessions/$id/recording", ['enabled' => true])->assertForbidden();           // students cannot
+        $this->as_($this->teacher)->putJson("/api/v1/sessions/$id/recording", ['enabled' => true])->assertOk();
+        $this->putJson("/api/v1/sessions/$id/recording", ['enabled' => true])->assertOk();                                   // idempotent
+        $this->assertCount(1, array_filter(FakeMediaProvider::$calls, fn ($c) => $c[0] === 'startRecording'));
+        $rec = \App\Models\SessionRecording::withoutGlobalScopes()->firstOrFail();
+        $this->assertSame('recording', $rec->status);
+        $this->assertStringStartsWith('schools/'.$this->school->id.'/recordings/', $rec->object_key);
+        $this->as_($this->u1)->postJson("/api/v1/sessions/$id/join")->assertJsonPath('recording', true);                      // joiners are told
+
+        $this->as_($this->teacher)->putJson("/api/v1/sessions/$id/recording", ['enabled' => false])->assertOk()->assertJsonPath('data.recording_enabled', false);
+        $this->assertSame('stopping', $rec->fresh()->status);
+
+        // egress finished: signed webhook attaches the object as a private file; replays change nothing
+        $payload = json_encode(['id' => $rec->provider_id, 'status' => 'EGRESS_COMPLETE', 'file' => ['size' => 1234, 'duration' => 62000000000]]);
+        $this->call('POST', '/api/v1/webhooks/livekit', [], [], [], ['HTTP_AUTHORIZATION' => 'egress', 'CONTENT_TYPE' => 'application/json'], $payload)->assertOk();
+        $this->call('POST', '/api/v1/webhooks/livekit', [], [], [], ['HTTP_AUTHORIZATION' => 'egress', 'CONTENT_TYPE' => 'application/json'], $payload)->assertOk();
+        $rec->refresh();
+        $this->assertSame(['ready', 1234, 62], [$rec->status, $rec->size, $rec->duration_seconds]);
+        $this->assertSame(1, \App\Models\StoredFile::withoutGlobalScopes()->where('context_type', 'recording')->count());
+
+        // who may see it
+        $this->as_($this->teacher)->getJson("/api/v1/sessions/$id/recordings")->assertOk()->assertJsonPath('data.0.status', 'ready');
+        $this->as_($this->admin)->getJson("/api/v1/sessions/$id/recordings")->assertOk();
+        $this->as_($this->u1)->getJson("/api/v1/sessions/$id/recordings")->assertForbidden();
+        $this->as_($this->guardian)->getJson("/api/v1/sessions/$id/recordings")->assertForbidden();
+        $fileId = $rec->file_id;
+        $this->as_($this->teacher)->getJson("/api/v1/files/$fileId/link")->assertOk();
+        $this->as_($this->admin)->getJson("/api/v1/files/$fileId/link")->assertOk();
+        $this->as_($this->u1)->getJson("/api/v1/files/$fileId/link")->assertStatus(404);                                       // students never get the link
+    }
+
+    public function test_ending_the_class_stops_a_running_recording(): void
+    {
+        $id = $this->liveWithRecording();
+        $this->as_($this->teacher)->putJson("/api/v1/sessions/$id/recording", ['enabled' => true])->assertOk();
+        $this->postJson("/api/v1/sessions/$id/end")->assertOk();
+        $this->assertNotEmpty(array_filter(FakeMediaProvider::$calls, fn ($c) => $c[0] === 'stopRecording'));
+        $this->assertSame('stopping', \App\Models\SessionRecording::withoutGlobalScopes()->first()->status);
+    }
+
     private function timetable(): array
     {
         $r = $this->as_($this->admin)->postJson('/api/v1/timetables', [

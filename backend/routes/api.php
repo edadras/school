@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\Route;
 
 // ---- Public -----------------------------------------------------------------
 Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:login');
+Route::post('auth/2fa/verify', [\App\Modules\Auth\Http\TwoFactorController::class, 'verifyLogin'])->middleware('throttle:10,1');
 Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:6,1');
 Route::post('auth/reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:6,1');
 Route::post('schools/register', [SchoolRegistrationController::class, 'register'])->middleware('throttle:school-register');
@@ -48,6 +49,10 @@ Route::post('webhooks/livekit', [WebhookController::class, 'livekit']);
 // ---- Authenticated (no school context) -------------------------------------
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('auth/me', [AuthController::class, 'me']);
+    Route::get('me/2fa', [\App\Modules\Auth\Http\TwoFactorController::class, 'status']);
+    Route::post('me/2fa/setup', [\App\Modules\Auth\Http\TwoFactorController::class, 'setup'])->middleware('throttle:10,1');
+    Route::post('me/2fa/confirm', [\App\Modules\Auth\Http\TwoFactorController::class, 'confirm'])->middleware('throttle:10,1');
+    Route::delete('me/2fa', [\App\Modules\Auth\Http\TwoFactorController::class, 'disable'])->middleware('throttle:10,1');
     Route::post('auth/logout', [AuthController::class, 'logout']);
 
     // School owner follows up on / resubmits their own registration while still "pending".
@@ -218,6 +223,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('sessions/{id}/leave', [SessionController::class, 'leave'])->whereNumber('id');
         Route::put('sessions/{id}/hand', [SessionController::class, 'hand'])->whereNumber('id');
         Route::post('sessions/{id}/issues', [SessionController::class, 'issue'])->whereNumber('id');
+        Route::get('sessions/{id}/recordings', [SessionController::class, 'recordings'])->whereNumber('id');
         Route::get('sessions/{id}/whiteboard', [SessionController::class, 'whiteboardIndex'])->whereNumber('id');
         Route::middleware('perm:sessions.host')->group(function () {
             Route::post('sessions', [SessionController::class, 'storeExtra']);

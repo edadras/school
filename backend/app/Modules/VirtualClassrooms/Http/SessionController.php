@@ -156,17 +156,24 @@ class SessionController extends Controller
         return response()->json(['by_status' => (object) collect($rows)->all(), 'issues' => (object) collect($issues)->all(), 'live_now' => LessonSession::where('status', 'live')->count()]);
     }
 
-    /** Recording is opt-in per school policy AND per session; participants are told via the join payload. */
-    public function recording(Request $request, int $id, SettingsRepository $settings): JsonResponse
+    /** Recording is opt-in per school policy AND per session; participants are told in real time and in the join payload. */
+    public function recording(Request $request, int $id, \App\Modules\VirtualClassrooms\RecordingService $rec): JsonResponse
     {
         $s = $this->find($request, $id);
         abort_unless($this->svc->isHost($request->user(), $s), 403);
-        abort_unless($settings->get('recording.allowed', false), 422, 'ضبط کلاس طبق سیاست مدرسه مجاز نیست.');
-        $s->update(['recording_enabled' => $request->boolean('enabled')]);
-        Audit::record($s->recording_enabled ? 'session.recording_on' : 'session.recording_off', $s);
-        app(\App\Modules\Realtime\Realtime::class)->session($s, 'recording', ['enabled' => $s->recording_enabled]);
+        $request->boolean('enabled') ? $rec->start($s, $request->user()) : $rec->stop($s);
 
-        return response()->json(['data' => $this->present($s)]);
+        return response()->json(['data' => $this->present($s->refresh())]);
+    }
+
+    /** Recordings of one class: host and school managers only (never students or guardians). */
+    public function recordings(Request $request, int $id): JsonResponse
+    {
+        $s = $this->find($request, $id);
+        abort_unless($this->svc->isHost($request->user(), $s) || $this->access->can($request->user(), 'sessions.monitor'), 403);
+
+        return response()->json(['data' => \App\Models\SessionRecording::where('lesson_session_id', $s->id)->orderByDesc('id')
+            ->get(['id', 'status', 'file_id', 'size', 'duration_seconds', 'error', 'started_at', 'ended_at'])]);
     }
 
     public function media(MediaProvider $media): JsonResponse

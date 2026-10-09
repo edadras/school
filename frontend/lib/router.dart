@@ -49,6 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.uri.path;
       if (!s.ready) return loc == '/' ? null : '/';
       if (!s.signedIn) return _publicPaths.contains(loc) ? null : '/login';
+      if (s.user?['two_factor_setup_required'] == true) return loc == '/profile' ? null : '/profile';   // platform policy: enrol first
       if (s.needsSchoolChoice) return loc == '/choose-school' ? null : '/choose-school';
       // Organisation whose school is not active yet (pending / needs changes / rejected / suspended).
       if (s.platformRole == null && s.active != null && s.active!.schoolStatus != 'active') return loc == '/pending' ? null : '/pending';

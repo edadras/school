@@ -29,6 +29,14 @@ interface MediaProvider
 
     public function endRoom(string $room): void;
 
-    /** @return array{event:string, room:?string, identity:?string}|null  null => signature invalid */
+    /** True when an Egress (recording) service and its output storage are configured. */
+    public function recordingConfigured(): bool;
+
+    /** Starts a composite recording of the room; returns the provider's recording id. @param string $filepath object key inside the output bucket */
+    public function startRecording(string $room, string $filepath): string;
+
+    public function stopRecording(string $recordingId): void;
+
+    /** @return array{event:string, room:?string, identity:?string, egress?:array}|null  null => signature invalid */
     public function parseWebhook(string $body, ?string $authorization): ?array;
 }

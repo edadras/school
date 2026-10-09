@@ -33,9 +33,19 @@ class FileAccess
             'submission' => $this->submissionReadable($u, $f),
             'message' => $this->messageReadable($u, $f),
             'exam_question' => $this->questionMediaReadable($u, $f),
+            'recording' => $this->recordingReadable($u, $f),
             'logo' => true,
             default => false,   // unattached files are private to the uploader
         };
+    }
+
+    /** Recordings: the class's host and school managers only. */
+    private function recordingReadable(User $u, StoredFile $f): bool
+    {
+        $rec = \App\Models\SessionRecording::where('file_id', $f->id)->first();
+        $session = $rec ? \App\Models\LessonSession::find($rec->lesson_session_id) : null;
+
+        return $session && (app(\App\Modules\VirtualClassrooms\LessonSessionService::class)->isHost($u, $session) || $this->access->can($u, 'sessions.monitor'));
     }
 
     private function assignmentOfFile(StoredFile $f): ?Assignment

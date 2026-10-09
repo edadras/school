@@ -124,6 +124,15 @@ class _AdminSettingsState extends ConsumerState<AdminSettings> with SingleTicker
             ListTile(contentPadding: EdgeInsets.zero, title: const Text('حداکثر حجم هر فایل (مگابایت)'), trailing: Text(faDigits(st['files.max_mb'] ?? 20)), onTap: () async { final v = await promptText(context, 'حداکثر حجم فایل', label: 'مگابایت'); if (v != null && int.tryParse(v) != null) _set({'files.max_mb': int.parse(v)}); }),
             ListTile(contentPadding: EdgeInsets.zero, title: const Text('تأخیر مجاز پیش از «دیرکرد» (دقیقه)'), trailing: Text(faDigits(st['attendance.late_after_minutes'] ?? 5)), onTap: () async { final v = await promptText(context, 'دقیقه', label: 'عدد'); if (v != null && int.tryParse(v) != null) _set({'attendance.late_after_minutes': int.parse(v)}); }),
           ])),
+          const SectionTitle('نگهداری و پاک‌سازی داده‌ها'),
+          AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('هر روز ساعت ۰۲:۳۰ طبق این سیاست پاک‌سازی انجام می‌شود. «۰» یعنی نگهداری دائم. حداقل مقدار ۳۰ روز است. نمرات، کارنامه، ثبت‌نام و سابقهٔ حسابرسی هرگز حذف نمی‌شوند. فایل‌های بدون استفاده (قدیمی‌تر از ۷ روز) همیشه پاک می‌شوند.', style: Theme.of(context).textTheme.bodySmall),
+            for (final r in const [('retention.messages_days', 'پیام‌ها و پیوست‌هایشان'), ('retention.notifications_days', 'اعلان‌های خوانده‌شده'), ('retention.ai_requests_days', 'سابقهٔ درخواست‌های AI'), ('retention.whiteboard_days', 'رویدادهای تخته سفید'), ('retention.tickets_days', 'درخواست‌های پشتیبانی بسته‌شده')])
+              ListTile(contentPadding: EdgeInsets.zero, title: Text(r.$2), trailing: Text(((st[r.$1] ?? 0) as num) == 0 ? 'دائم' : '${faDigits(st[r.$1])} روز'), onTap: () async {
+                final v = await promptText(context, '${r.$2} — چند روز نگهداری شود؟ (۰ = دائم، حداقل ۳۰)', label: 'روز', maxLines: 1);
+                if (v != null && int.tryParse(v.trim()) != null) _set({r.$1: int.parse(v.trim())});
+              }),
+          ])),
           const SectionTitle('فیلدهای اختصاصی دانش‌آموز'),
           AppCard(child: ListTile(contentPadding: EdgeInsets.zero, title: Text(((st['custom_fields.students'] as List?) ?? []).isEmpty ? 'فیلد اضافه‌ای تعریف نشده' : (st['custom_fields.students'] as List).join('، ')), subtitle: const Text('نام‌ها را با ویرگول جدا کنید (حداکثر ۲۰ مورد؛ مقدار متنی کوتاه).'), trailing: const Icon(Icons.edit_outlined), onTap: () async { final t = await promptText(context, 'فیلدهای اختصاصی', label: 'مثال: گروه خونی، بیماری خاص', required: false, maxLines: 1); if (t != null) _set({'custom_fields.students': t.split(RegExp(r'[,،]')).map((e) => e.trim()).where((e) => e.isNotEmpty).take(20).toList()}); })),
         ]);

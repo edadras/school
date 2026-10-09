@@ -10,6 +10,12 @@ return [
         'api_url' => env('LIVEKIT_API_URL'),        // https://… (server-to-server); defaults to url with http(s)
         'key' => env('LIVEKIT_API_KEY'),
         'secret' => env('LIVEKIT_API_SECRET'),
+        // Recording (LiveKit Egress service + S3-compatible output). All three must be set, otherwise recording reports "unconfigured".
+        'egress' => [
+            'bucket' => env('EGRESS_S3_BUCKET'), 'access_key' => env('EGRESS_S3_ACCESS_KEY'), 'secret' => env('EGRESS_S3_SECRET'),
+            'region' => env('EGRESS_S3_REGION'), 'endpoint' => env('EGRESS_S3_ENDPOINT'), 'path_style' => (bool) env('EGRESS_S3_PATH_STYLE', false),
+            'disk' => env('EGRESS_FILES_DISK', 's3'),       // Laravel disk pointing at the same bucket (used to serve playback links)
+        ],
     ],
     // Optional external TURN (coturn with use-auth-secret). LiveKit also ships a built-in TURN.
     'turn' => [

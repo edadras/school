@@ -63,6 +63,7 @@ class PlatformController extends Controller
 
                 return ['ok' => Cache::get('health') === 1, 'detail' => config('cache.default')];
             }),
+            'malware_scan' => $check(fn () => app(\App\Modules\Files\Scan\MalwareScanner::class)->health()),
             'storage' => $check(fn () => ['ok' => Storage::disk(config('files.disk'))->exists('.') || true, 'detail' => config('files.disk')]),
             'queue' => $check(fn () => ['ok' => true, 'detail' => config('queue.default'), 'failed_jobs' => (int) DB::table('failed_jobs')->count(),
                 'pending_jobs' => config('queue.default') === 'database' ? (int) DB::table('jobs')->count() : null]),
@@ -164,10 +165,11 @@ class PlatformController extends Controller
     public function updateSettings(Request $request): JsonResponse
     {
         $d = $request->validate(['settings' => ['required', 'array'], 'settings.default_timezone' => ['sometimes', 'timezone:all'], 'settings.default_locale' => ['sometimes', Rule::in(['fa', 'en', 'tr'])],
-            'settings.default_plan' => ['sometimes', 'array'], 'settings.registration_open' => ['sometimes', 'boolean'], 'settings.maintenance_banner' => ['nullable', 'string', 'max:300']]);
+            'settings.default_plan' => ['sometimes', 'array'], 'settings.registration_open' => ['sometimes', 'boolean'], 'settings.require_2fa_for_admins' => ['sometimes', 'boolean'], 'settings.maintenance_banner' => ['nullable', 'string', 'max:300']]);
         foreach ($d['settings'] as $k => $v) {
             PlatformSetting::updateOrCreate(['key' => $k], ['value' => is_array($v) ? $v : [$v]]);
         }
+        \Illuminate\Support\Facades\Cache::forget('policy:require_2fa');
         Audit::record('platform.settings_changed', null, null, $d['settings']);
 
         return $this->settings();

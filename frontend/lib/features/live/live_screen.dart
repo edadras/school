@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:livekit_client/livekit_client.dart' as lk;
+import 'recordings.dart';
 import '../../core/api.dart';
 import '../../core/format.dart';
 import '../../core/realtime.dart';
@@ -328,6 +329,7 @@ class _LiveScreenState extends ConsumerState<LiveScreen> with SingleTickerProvid
         ),
       if (_participants.where((x) => x['role'] != 'host').isEmpty) const Padding(padding: EdgeInsets.all(12), child: Text('هنوز کسی وارد نشده است.')),
       const Divider(),
+      TextButton.icon(onPressed: () => showRecordings(context, ref, widget.sessionId), icon: const Icon(Icons.video_library_outlined), label: const Text('ضبط‌های این کلاس')),
       SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('ضبط کلاس'), subtitle: const Text('فقط در صورت فعال‌بودن سیاست ضبط در مدرسه؛ شرکت‌کنندگان مطلع می‌شوند.'), value: _recording, onChanged: (v) async {
         try { final r = await ref.read(apiProvider).put('/sessions/${widget.sessionId}/recording', data: {'enabled': v}); setState(() => _recording = r['data']['recording_enabled'] == true); } on ApiException catch (e) { if (mounted) toast(context, e.readable, error: true); }
       }),

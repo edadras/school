@@ -49,6 +49,25 @@ class FakeMediaProvider implements MediaProvider
         self::$calls[] = ['remove', $room, $identity];
     }
 
+    public static bool $recording = true;
+
+    public function recordingConfigured(): bool
+    {
+        return self::$recording;
+    }
+
+    public function startRecording(string $room, string $filepath): string
+    {
+        self::$calls[] = ['startRecording', $room, $filepath];
+
+        return 'EG_'.substr(md5($filepath), 0, 10);
+    }
+
+    public function stopRecording(string $recordingId): void
+    {
+        self::$calls[] = ['stopRecording', $recordingId];
+    }
+
     public function endRoom(string $room): void
     {
         if (self::$failEndRoom) {
@@ -59,6 +78,12 @@ class FakeMediaProvider implements MediaProvider
 
     public function parseWebhook(string $body, ?string $authorization): ?array
     {
+        if ($authorization === 'egress') {
+            $e = json_decode($body, true);
+
+            return ['event' => 'egress_ended', 'room' => null, 'identity' => null, 'egress' => $e];
+        }
+
         return $authorization === 'valid' ? json_decode($body, true) : null;
     }
 }

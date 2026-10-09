@@ -28,6 +28,8 @@ class SchoolAdminController extends Controller
         'ai.enabled' => 'boolean', 'ai.student_enabled' => 'boolean', 'ai.student_min_grade_level' => 'integer',
         'ai.daily_limit_student' => 'integer', 'ai.daily_limit_teacher' => 'integer', 'ai.daily_token_budget' => 'integer',
         'custom_fields.students' => 'array',
+        'retention.messages_days' => 'integer', 'retention.notifications_days' => 'integer', 'retention.ai_requests_days' => 'integer',
+        'retention.whiteboard_days' => 'integer', 'retention.tickets_days' => 'integer',
     ];
 
     public function __construct(private SettingsRepository $settings, private Access $access) {}
@@ -61,6 +63,7 @@ class SchoolAdminController extends Controller
             $type = self::ALLOWED_SETTINGS[$key];
             $ok = match ($type) { 'boolean' => is_bool($value), 'integer' => is_int($value) && $value >= 0, 'array' => is_array($value) };
             abort_unless($ok, 422, "مقدار نامعتبر برای $key");
+            abort_if(str_starts_with($key, 'retention.') && $value !== 0 && $value < 30, 422, 'حداقل دورهٔ نگهداری ۳۰ روز است (۰ = نگهداری دائم).');
             $this->settings->set($key, $value);
             $changed[$key] = $value;
         }

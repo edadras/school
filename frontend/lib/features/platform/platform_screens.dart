@@ -18,6 +18,24 @@ class PlatformDashboard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => PageBody(maxWidth: 1250, onRefresh: () async { ref.invalidate(_statsProvider); ref.invalidate(_healthProvider); ref.invalidate(_metricsProvider); }, children: [
         const PageHeader('نمای کلی سامانه'),
+        const SectionTitle('عملکرد API (۲۴ ساعت اخیر)'),
+        Async<Map<String, dynamic>>(ref.watch(_metricsProvider), onRetry: () => ref.invalidate(_metricsProvider), builder: (m) {
+          final hours = (m['hours'] as List).cast<Map>();
+          final n = hours.fold<int>(0, (a, h) => a + (h['requests'] as int));
+          final e5 = hours.fold<int>(0, (a, h) => a + (h['errors_5xx'] as int));
+          final weighted = hours.fold<double>(0, (a, h) => a + ((h['avg_ms'] as num?) ?? 0) * (h['requests'] as int));
+          final slow = (m['slowest_routes'] as List).cast<Map>().take(5);
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Wrap(spacing: 12, runSpacing: 12, children: [
+              SizedBox(width: 250, child: StatCard(label: 'درخواست‌ها', value: faDigits(n), icon: Icons.swap_vert)),
+              SizedBox(width: 250, child: StatCard(label: 'میانگین تأخیر (ms)', value: n == 0 ? '—' : faDigits((weighted / n).round()), icon: Icons.speed)),
+              SizedBox(width: 250, child: StatCard(label: 'خطای سرور (۵xx)', value: faDigits(e5), icon: Icons.error_outline, tone: e5 > 0 ? Tone.danger : Tone.success)),
+              SizedBox(width: 250, child: StatCard(label: 'صف: در انتظار / ناموفق', value: '${faDigits(m['queue_backlog'])} / ${faDigits(m['failed_jobs'])}', icon: Icons.queue, tone: (m['failed_jobs'] as int) > 0 ? Tone.warn : Tone.neutral)),
+            ]),
+            if (slow.isNotEmpty) const SectionTitle('کندترین مسیرها'),
+            for (final r in slow) AppCard(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), child: Row(children: [Expanded(child: Text('${r['route']}', textDirection: TextDirection.ltr, overflow: TextOverflow.ellipsis)), Text('${faDigits(r['avg_ms'])}ms · ${faDigits(r['requests'])} درخواست')])),
+          ]);
+        }),
         Async<Map<String, dynamic>>(ref.watch(_statsProvider), onRetry: () => ref.invalidate(_statsProvider), builder: (s) {
           final t = s['totals'] as Map;
           final by = Map<String, dynamic>.from(t['by_status'] as Map);
@@ -37,24 +55,6 @@ class PlatformDashboard extends ConsumerWidget {
             ]))),
           ]);
         }),
-        const SectionTitle('عملکرد API (۲۴ ساعت اخیر)'),
-        Async<Map<String, dynamic>>(ref.watch(_metricsProvider), onRetry: () => ref.invalidate(_metricsProvider), builder: (m) {
-          final hours = (m['hours'] as List).cast<Map>();
-          final n = hours.fold<int>(0, (a, h) => a + (h['requests'] as int));
-          final e5 = hours.fold<int>(0, (a, h) => a + (h['errors_5xx'] as int));
-          final weighted = hours.fold<double>(0, (a, h) => a + ((h['avg_ms'] as num?) ?? 0) * (h['requests'] as int));
-          final slow = (m['slowest_routes'] as List).cast<Map>().take(5);
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Wrap(spacing: 12, runSpacing: 12, children: [
-              SizedBox(width: 250, child: StatCard(label: 'درخواست‌ها', value: faDigits(n), icon: Icons.swap_vert)),
-              SizedBox(width: 250, child: StatCard(label: 'میانگین تأخیر (ms)', value: n == 0 ? '—' : faDigits((weighted / n).round()), icon: Icons.speed)),
-              SizedBox(width: 250, child: StatCard(label: 'خطای سرور (۵xx)', value: faDigits(e5), icon: Icons.error_outline, tone: e5 > 0 ? Tone.danger : Tone.success)),
-              SizedBox(width: 250, child: StatCard(label: 'صف: در انتظار / ناموفق', value: '${faDigits(m['queue_backlog'])} / ${faDigits(m['failed_jobs'])}', icon: Icons.queue, tone: (m['failed_jobs'] as int) > 0 ? Tone.warn : Tone.neutral)),
-            ]),
-            if (slow.isNotEmpty) const SectionTitle('کندترین مسیرها'),
-            for (final r in slow) AppCard(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), child: Row(children: [Expanded(child: Text('${r['route']}', textDirection: TextDirection.ltr, overflow: TextOverflow.ellipsis)), Text('${faDigits(r['avg_ms'])}ms · ${faDigits(r['requests'])} درخواست')])),
-          ]);
-        }),
         const SectionTitle('سلامت سرویس‌ها'),
         Async<Map<String, dynamic>>(ref.watch(_healthProvider), onRetry: () => ref.invalidate(_healthProvider), builder: (h) => Wrap(spacing: 12, runSpacing: 12, children: [
               for (final e in h.entries.where((e) => e.value is Map)) SizedBox(width: 250, child: AppCard(child: Row(children: [
@@ -65,7 +65,7 @@ class PlatformDashboard extends ConsumerWidget {
             ])),
       ]);
 
-  static String _hn(String k) => {'database': 'پایگاه داده', 'cache': 'حافظهٔ نهان', 'storage': 'ذخیره‌سازی فایل', 'queue': 'صف پردازش', 'media': 'سرور رسانه (کلاس آنلاین)', 'ai': 'هوش مصنوعی', 'push': 'اعلان فشاری', 'realtime': 'ارتباط زنده (WebSocket)'}[k] ?? k;
+  static String _hn(String k) => {'database': 'پایگاه داده', 'cache': 'حافظهٔ نهان', 'storage': 'ذخیره‌سازی فایل', 'queue': 'صف پردازش', 'media': 'سرور رسانه (کلاس آنلاین)', 'ai': 'هوش مصنوعی', 'push': 'اعلان فشاری', 'realtime': 'ارتباط زنده (WebSocket)', 'malware_scan': 'پویشگر ویروس فایل'}[k] ?? k;
 }
 
 class PlatformApprovals extends ConsumerStatefulWidget {
@@ -227,9 +227,9 @@ class PlatformSettings extends ConsumerWidget {
           final d = Map<String, dynamic>.from((s.data as Map)['data'] as Map);
           String v(String k) => ((d[k] as List?)?.firstOrNull ?? '—').toString();
           return AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            LabeledRow('منطقهٔ زمانی پیش‌فرض', Text(v('default_timezone'), textDirection: TextDirection.ltr)), LabeledRow('زبان پیش‌فرض', Text(v('default_locale'))), LabeledRow('ثبت‌نام مدرسه باز است', Text(v('registration_open'))), LabeledRow('بنر اطلاع‌رسانی', Text(v('maintenance_banner'))),
+            LabeledRow('منطقهٔ زمانی پیش‌فرض', Text(v('default_timezone'), textDirection: TextDirection.ltr)), LabeledRow('زبان پیش‌فرض', Text(v('default_locale'))), LabeledRow('ثبت‌نام مدرسه باز است', Text(v('registration_open'))), LabeledRow('احراز دومرحله‌ای برای مدیران اجباری است', Text(v('require_2fa_for_admins'))), LabeledRow('بنر اطلاع‌رسانی', Text(v('maintenance_banner'))),
             const SizedBox(height: 10),
-            OutlinedButton.icon(onPressed: () => showForm(context, title: 'ویرایش تنظیمات', fields: const [FieldSpec('default_timezone', 'منطقهٔ زمانی'), FieldSpec('default_locale', 'زبان', type: FieldType.dropdown, options: [Option('fa', 'فارسی'), Option('en', 'English'), Option('tr', 'Türkçe')]), FieldSpec('registration_open', 'ثبت‌نام مدارس باز باشد', type: FieldType.toggle, initial: true), FieldSpec('maintenance_banner', 'بنر اطلاع‌رسانی')], submit: (x) async => ref.read(apiProvider).patch('/platform/settings', data: {'settings': x..removeWhere((k, y) => y == null)})), icon: const Icon(Icons.edit_outlined), label: const Text('ویرایش')),
+            OutlinedButton.icon(onPressed: () => showForm(context, title: 'ویرایش تنظیمات', fields: const [FieldSpec('default_timezone', 'منطقهٔ زمانی'), FieldSpec('default_locale', 'زبان', type: FieldType.dropdown, options: [Option('fa', 'فارسی'), Option('en', 'English'), Option('tr', 'Türkçe')]), FieldSpec('registration_open', 'ثبت‌نام مدارس باز باشد', type: FieldType.toggle, initial: true), FieldSpec('require_2fa_for_admins', 'احراز هویت دومرحله‌ای برای مدیران کل، پشتیبان‌ها و مدیران مدرسه اجباری باشد', type: FieldType.toggle, initial: false), FieldSpec('maintenance_banner', 'بنر اطلاع‌رسانی')], submit: (x) async => ref.read(apiProvider).patch('/platform/settings', data: {'settings': x..removeWhere((k, y) => y == null)})), icon: const Icon(Icons.edit_outlined), label: const Text('ویرایش')),
           ]));
         }),
       ]);

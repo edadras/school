@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../live/recordings.dart';
 import '../../core/api.dart';
 import '../../core/format.dart';
 import '../../core/session.dart';
@@ -68,6 +69,7 @@ class AdminLive extends ConsumerWidget {
               Icon(s['status'] == 'live' ? Icons.videocam : Icons.videocam_outlined, color: s['status'] == 'live' ? Palette.success : Palette.muted), const SizedBox(width: 12),
               Expanded(child: Text('${s['title']}  ·  ${fmtDate(s['scheduled_start'], withTime: true)}')), StatusChip(statusName(s['status'] as String), tone: s['status'] == 'live' ? Tone.success : (s['status'] == 'not_held' ? Tone.danger : Tone.neutral)),
               if (s['status'] == 'live') const Padding(padding: EdgeInsets.only(right: 8), child: Text('مشاهده')),
+              IconButton(tooltip: 'ضبط‌ها', icon: const Icon(Icons.video_library_outlined), onPressed: () => showRecordings(c, ref, s['id'] as int)),
             ]))),
       ]);
 }

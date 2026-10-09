@@ -26,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: env('TRUSTED_PROXIES') ? explode(',', env('TRUSTED_PROXIES')) : null);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
         $middleware->appendToGroup('api', \App\Http\Middleware\RecordMetrics::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\EnforceTwoFactorSetup::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API-only: always JSON, never an HTML error page or redirect to a login route.

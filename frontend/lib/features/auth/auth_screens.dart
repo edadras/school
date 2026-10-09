@@ -46,15 +46,15 @@ class _LoginState extends ConsumerState<LoginScreen> {
   final _login = TextEditingController();
   final _pass = TextEditingController();
   final _form = GlobalKey<FormState>();
-  String? _error;
+  final _code = TextEditingController();
+  String? _error, _challenge;
   bool _busy = false, _show = false;
 
-  Future<void> _submit() async {
-    if (!_form.currentState!.validate()) return;
+  Future<void> _verify() async {
+    if (_code.text.trim().isEmpty) return;
     setState(() { _busy = true; _error = null; });
     try {
-      final api = ref.read(apiProvider);
-      final r = await api.post('/auth/login', data: {'login': _login.text.trim(), 'password': _pass.text, 'device_name': 'web'});
+      final r = await ref.read(apiProvider).post('/auth/2fa/verify', data: {'challenge': _challenge, 'code': _code.text.trim(), 'device_name': 'web'});
       await ref.read(sessionProvider.notifier).signIn(r['token'], Map<String, dynamic>.from(r['user']));
     } on ApiException catch (e) {
       setState(() => _error = e.readable);
@@ -63,8 +63,38 @@ class _LoginState extends ConsumerState<LoginScreen> {
     }
   }
 
+  Future<void> _submit() async {
+    if (!_form.currentState!.validate()) return;
+    setState(() { _busy = true; _error = null; });
+    try {
+      final api = ref.read(apiProvider);
+      final r = await api.post('/auth/login', data: {'login': _login.text.trim(), 'password': _pass.text, 'device_name': 'web'});
+      if (r['two_factor_required'] == true) {
+        setState(() => _challenge = r['challenge'] as String);
+        return;
+      }
+      await ref.read(sessionProvider.notifier).signIn(r['token'], Map<String, dynamic>.from(r['user']));
+    } on ApiException catch (e) {
+      setState(() => _error = e.readable);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Widget _twoFactor() => _AuthFrame(
+        title: 'تأیید دومرحله‌ای',
+        subtitle: 'کد ۶ رقمی برنامهٔ احراز هویت (یا یکی از کدهای بازیابی) را وارد کنید',
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          if (_error != null) Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Palette.dangerSoft, borderRadius: BorderRadius.circular(10)), child: Text(_error!, key: const Key('login-error'), style: const TextStyle(color: Palette.danger))),
+          TextField(key: const Key('code-field'), controller: _code, autofocus: true, textDirection: TextDirection.ltr, keyboardType: TextInputType.text, onSubmitted: (_) => _verify(), decoration: const InputDecoration(labelText: 'کد تأیید')),
+          const SizedBox(height: 18),
+          FilledButton(key: const Key('verify-button'), onPressed: _busy ? null : _verify, child: const Text('تأیید و ورود')),
+          TextButton(onPressed: () => setState(() { _challenge = null; _code.clear(); _error = null; }), child: const Text('بازگشت')),
+        ]),
+      );
+
   @override
-  Widget build(BuildContext context) => _AuthFrame(
+  Widget build(BuildContext context) => _challenge != null ? _twoFactor() : _AuthFrame(
         title: 'ورود به سامانه مدرسه',
         subtitle: 'برای ادامه وارد حساب خود شوید',
         child: Form(

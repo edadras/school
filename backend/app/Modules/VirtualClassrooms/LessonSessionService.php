@@ -152,6 +152,7 @@ class LessonSessionService
             return $s;
         }
         $wasLive = $s->status === 'live';
+        app(RecordingService::class)->stop($s);       // finalise any running recording before the room disappears
         $this->media->endRoom($s->room_name);
         SessionParticipant::where('lesson_session_id', $s->id)->whereNull('left_at')->update(['left_at' => now()]);
         $s->update(['status' => $status, 'ended_at' => now()]);

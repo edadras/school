@@ -17,7 +17,13 @@ class WebhookController extends Controller
     {
         $ev = $media->parseWebhook($request->getContent(), $request->header('Authorization'));
         abort_unless($ev, 401);
-        $ev += ['room' => null, 'identity' => null, 'event' => ''];
+        $ev += ['room' => null, 'identity' => null, 'event' => '', 'egress' => null];
+        if ($ev['event'] === 'egress_ended' && $ev['egress']) {
+            $rec = \App\Models\SessionRecording::withoutGlobalScopes()->where('provider_id', $ev['egress']['id'] ?? '')->first();
+            $rec && app(\App\Modules\Tenancy\CurrentSchool::class)->run(\App\Models\School::findOrFail($rec->school_id), fn () => app(\App\Modules\VirtualClassrooms\RecordingService::class)->completed($ev['egress']));
+
+            return response()->json(['ok' => true]);
+        }
         $session = $ev['room'] ? LessonSession::withoutGlobalScopes()->where('room_name', $ev['room'])->first() : null;
         if (! $session) {
             return response()->json(['ok' => true]);        // unknown room: ack so the SFU does not retry forever

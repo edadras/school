@@ -7,6 +7,7 @@ import '../../core/strings.dart';
 import '../../design/theme.dart';
 import '../../design/widgets.dart';
 import 'bell.dart';
+import 'two_factor.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -68,6 +69,8 @@ class _ProfileState extends ConsumerState<ProfileScreen> {
               SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(c.$2), value: _prefs['*|${c.$1}'] ?? (c.$1 != 'email'), onChanged: (v) => _set(c.$1, v)),
           ])),
         ],
+        const SectionTitle('امنیت حساب'),
+        const TwoFactorCard(),
         const SectionTitle('حساب'),
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           OutlinedButton.icon(onPressed: () async { try { await ref.read(apiProvider).post('/auth/logout'); } catch (_) {} await ref.read(sessionProvider.notifier).signOut(); }, icon: const Icon(Icons.logout), label: const Text('خروج از حساب')),

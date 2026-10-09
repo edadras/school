@@ -29,6 +29,11 @@ class AuthController extends Controller
             throw ValidationException::withMessages(['login' => ['اطلاعات ورود نادرست است.']]);
         }
 
+        if (app(\App\Modules\Auth\TwoFactor::class)->enabled($user)) {
+            // Password was right; no API token until the second factor is proven.
+            return response()->json(['two_factor_required' => true, 'challenge' => app(TwoFactorController::class)->challengeFor($user)]);
+        }
+
         $user->forceFill(['last_login_at' => now()])->save();
         $token = $user->createToken($data['device_name'] ?? 'web', ['*'], now()->addDays(14));
 
@@ -39,12 +44,12 @@ class AuthController extends Controller
             Audit::record('auth.admin_login', $user);
         }
 
-        return response()->json(['token' => $token->plainTextToken, 'user' => $this->userPayload($user)]);
+        return response()->json(['token' => $token->plainTextToken, 'user' => $this->payload($user)]);
     }
 
     public function me(Request $request): JsonResponse
     {
-        return response()->json(['user' => $this->userPayload($request->user())]);
+        return response()->json(['user' => $this->payload($request->user())]);
     }
 
     public function logout(Request $request): JsonResponse
@@ -88,9 +93,12 @@ class AuthController extends Controller
         request()->setUserResolver(fn () => $user);
     }
 
-    private function userPayload(User $user): array
+    public function payload(User $user): array
     {
+        $tf = app(\App\Modules\Auth\TwoFactor::class);
+
         return [
+            'two_factor_enabled' => $tf->enabled($user), 'two_factor_setup_required' => $tf->requiredFor($user) && ! $tf->enabled($user),
             'id' => $user->id, 'name' => $user->name, 'email' => $user->email, 'locale' => $user->locale,
             'platform_role' => $user->platform_role,
             'memberships' => $user->memberships()->where('status', 'active')

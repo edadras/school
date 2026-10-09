@@ -47,6 +47,21 @@ class NullMediaProvider implements MediaProvider
         $this->fail();
     }
 
+    public function recordingConfigured(): bool
+    {
+        return false;
+    }
+
+    public function startRecording(string $room, string $filepath): string
+    {
+        $this->fail();
+    }
+
+    public function stopRecording(string $recordingId): void
+    {
+        // nothing was ever started
+    }
+
     public function endRoom(string $room): void
     {
         // Ending a class must never fail just because the SFU is absent.

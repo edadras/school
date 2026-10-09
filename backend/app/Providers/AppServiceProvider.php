@@ -20,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
             'openai' => new \App\Modules\AI\Providers\OpenAiCompatibleProvider(config('ai.openai')),
             default => new \App\Modules\AI\Providers\NullAiProvider,
         });
+        $this->app->bind(\App\Modules\Files\Scan\MalwareScanner::class, fn () => config('files.scan.provider') === 'clamav'
+            ? new \App\Modules\Files\Scan\ClamAvScanner(config('files.scan')) : new \App\Modules\Files\Scan\NullScanner);
         $this->app->bind(\App\Modules\VirtualClassrooms\Media\MediaProvider::class, fn () => \App\Modules\VirtualClassrooms\Media\MediaManager::make());
     }
 

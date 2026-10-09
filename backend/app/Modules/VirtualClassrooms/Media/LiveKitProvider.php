@@ -81,6 +81,36 @@ class LiveKitProvider implements MediaProvider
         }
     }
 
+    /** Egress needs its own service (livekit-egress) and an S3-compatible bucket; without both we say so instead of pretending. */
+    public function recordingConfigured(): bool
+    {
+        $e = $this->cfg['egress'] ?? [];
+
+        return $this->isConfigured() && ! empty($e['bucket']) && ! empty($e['access_key']) && ! empty($e['secret']);
+    }
+
+    public function startRecording(string $room, string $filepath): string
+    {
+        $e = $this->cfg['egress'];
+        $s3 = array_filter(['access_key' => $e['access_key'], 'secret' => $e['secret'], 'region' => $e['region'] ?? null, 'endpoint' => $e['endpoint'] ?? null,
+            'bucket' => $e['bucket'], 'force_path_style' => (bool) ($e['path_style'] ?? false)], fn ($v) => $v !== null && $v !== '');
+        $r = $this->twirp('StartRoomCompositeEgress', [
+            'room_name' => $room, 'layout' => 'speaker', 'audio_only' => false,
+            'file_outputs' => [['file_type' => 'MP4', 'filepath' => $filepath, 's3' => $s3]],
+        ], ['roomRecord' => true], 'livekit.Egress');
+        $r->throw();
+
+        return (string) $r->json('egress_id');
+    }
+
+    public function stopRecording(string $recordingId): void
+    {
+        $r = $this->twirp('StopEgress', ['egress_id' => $recordingId], ['roomRecord' => true], 'livekit.Egress');
+        if (! in_array($r->status(), [404, 412], true)) {   // already finished / unknown => fine
+            $r->throw();
+        }
+    }
+
     /** LiveKit signs webhooks with a JWT whose `sha256` claim is the base64 SHA-256 of the body. */
     public function parseWebhook(string $body, ?string $authorization): ?array
     {
@@ -93,7 +123,13 @@ class LiveKitProvider implements MediaProvider
         }
         $e = json_decode($body, true) ?: [];
 
-        return ['event' => $e['event'] ?? '', 'room' => $e['room']['name'] ?? null, 'identity' => $e['participant']['identity'] ?? null];
+        $egress = isset($e['egressInfo']) ? [
+            'id' => $e['egressInfo']['egressId'] ?? ($e['egressInfo']['egress_id'] ?? null), 'status' => $e['egressInfo']['status'] ?? null,
+            'room' => $e['egressInfo']['roomName'] ?? ($e['egressInfo']['room_name'] ?? null),
+            'file' => $e['egressInfo']['fileResults'][0] ?? ($e['egressInfo']['file_results'][0] ?? ($e['egressInfo']['file'] ?? null)), 'error' => $e['egressInfo']['error'] ?? null,
+        ] : null;
+
+        return ['event' => $e['event'] ?? '', 'room' => $e['room']['name'] ?? ($egress['room'] ?? null), 'identity' => $e['participant']['identity'] ?? null, 'egress' => $egress];
     }
 
     private function iceServers(string $identity): array
@@ -107,12 +143,12 @@ class LiveKitProvider implements MediaProvider
             'credential' => base64_encode(hash_hmac('sha1', $user, $this->turn['secret'], true))]];
     }
 
-    private function twirp(string $method, array $body, array $grant)
+    private function twirp(string $method, array $body, array $grant, string $service = 'livekit.RoomService')
     {
         $base = $this->cfg['api_url'] ?: preg_replace('#^ws#', 'http', (string) $this->cfg['url']);
 
         return Http::withToken($this->jwt(['video' => $grant], 60))->acceptJson()->timeout(10)
-            ->post(rtrim($base, '/')."/twirp/livekit.RoomService/$method", (object) $body);
+            ->post(rtrim($base, '/')."/twirp/$service/$method", (object) $body);
     }
 
     private function jwt(array $claims, int $ttl): string
