@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Permission extends Model
+{
+    protected $table = 'permissions';
+
+    protected $guarded = ['id'];
+
+    protected function casts(): array
+    {
+        return ['payload' => 'array', 'documents' => 'array', 'decided_at' => 'datetime'];
+    }
+}
