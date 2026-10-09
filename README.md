@@ -37,7 +37,7 @@ flutter run -d chrome --dart-define=API_BASE=http://localhost:8000/api/v1 \
 
 ## تست
 ```bash
-cd backend && php artisan test         # ۱۲۴ تست / ۸۹۸ assertion — روی SQLite و MariaDB 10.11 سبز
+cd backend && php artisan test         # ۱۵۵ تست / ۱۰۶۵ assertion — روی SQLite و MariaDB 10.11 سبز
 
 # E2E روی پشتهٔ واقعی (مرورگر Chromium، LiveKit، Reverb، صف و Scheduler)
 LIVEKIT_BIN=/path/to/livekit-server scripts/e2e-stack.sh start
