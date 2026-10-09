@@ -162,6 +162,8 @@ class WeeklyGrid extends StatelessWidget {
     if (!data.hasTimetable) return const EmptyState('برنامهٔ هفتگی فعالی وجود ندارد.', icon: Icons.event_busy_outlined);
     final days = data.workingDays..sort();
     final periods = data.periods;
+    // Phones: a grid of 7 columns does not fit, so show one card per day with its lessons in order.
+    if (MediaQuery.sizeOf(context).width < 600) return _agenda(context, days, periods);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Table(
@@ -194,5 +196,39 @@ class WeeklyGrid extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _agenda(BuildContext context, List<int> days, List<Map<String, dynamic>> periods) {
+    final lessons = periods.where((p) => p['kind'] == 'lesson').toList();
+    return Column(children: [
+      for (final d in days)
+        Builder(builder: (_) {
+          final rows = <Widget>[];
+          for (final p in lessons) {
+            for (final e in data.entries.where((e) => e['weekday'] == d && e['period_id'] == p['id'])) {
+              rows.add(InkWell(
+                onTap: onTapEntry == null ? null : () => onTapEntry!(e),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(children: [
+                    SizedBox(width: 64, child: Text(faDigits((p['starts_at'] as String).substring(0, 5)), style: Theme.of(context).textTheme.bodySmall)),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(data.subject(e['subject_id']), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      Text('${p['title']} · ${showSection ? data.section(e['section_id']) : data.teacher(e['teacher_id'])}', style: Theme.of(context).textTheme.bodySmall),
+                    ])),
+                  ]),
+                ),
+              ));
+            }
+          }
+          return Padding(padding: const EdgeInsets.only(bottom: 10), child: AppCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(weekdayNames[d], style: Theme.of(context).textTheme.titleMedium),
+              const Divider(height: 16),
+              if (rows.isEmpty) Text('کلاسی ندارید.', style: Theme.of(context).textTheme.bodySmall) else ...rows,
+            ]),
+          ));
+        }),
+    ]);
   }
 }
