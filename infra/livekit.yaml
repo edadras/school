@@ -1,0 +1,11 @@
+# LiveKit SFU. Keys come from the LIVEKIT_KEYS environment variable ("<key>: <secret>"), never from this file.
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+turn:
+  enabled: false          # coturn (service `turn`) is the TURN relay; see docs/realtime-and-media.md
+logging:
+  level: info

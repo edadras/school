@@ -30,7 +30,7 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('login:'.strtolower((string) $r->input('login')).'|'.$r->ip()),
             Limit::perMinute(30)->by('login-ip:'.$r->ip()),
         ]);
-        RateLimiter::for('school-register', fn (Request $r) => Limit::perHour(5)->by($r->ip()));
+        RateLimiter::for('school-register', fn (Request $r) => Limit::perHour((int) config('limits.register_per_hour'))->by($r->ip()));
         RateLimiter::for('api', fn (Request $r) => Limit::perMinute(120)->by($r->user()?->id ?: $r->ip()));
     }
 }

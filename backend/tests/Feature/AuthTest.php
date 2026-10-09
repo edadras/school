@@ -60,4 +60,12 @@ class AuthTest extends TestCase
         $this->getJson('/api/v1/academics/grades')->assertUnauthorized();
         $this->getJson('/api/v1/platform/schools')->assertUnauthorized();
     }
+
+    public function test_unauthenticated_call_is_a_json_401_with_hardening_headers_even_without_accept_header(): void
+    {
+        $r = $this->call('GET', '/api/v1/auth/me');   // no Accept: application/json
+        $r->assertStatus(401);
+        $this->assertSame('nosniff', $r->headers->get('X-Content-Type-Options'));
+        $this->assertStringContainsString('no-store', $r->headers->get('Cache-Control'));
+    }
 }

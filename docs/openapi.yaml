@@ -1,44 +1,3474 @@
 openapi: 3.0.3
-info: {title: School Platform API, version: 1.0.0-stage1, description: "Implemented endpoints only (stage 1). Persian messages in `message`."}
-servers: [{url: /api/v1}]
+info:
+  title: School Platform API
+  version: 1.0.0
+  description: 'Generated from the Laravel route table (scripts/gen_openapi.py). Persian messages in `message`. Multi-tenant: send `X-School-Id`
+    when the user belongs to several schools; it is a selector only and is verified against active memberships.'
+servers:
+- url: /api/v1
+security:
+- bearer: []
 components:
-  securitySchemes: {bearer: {type: http, scheme: bearer}}
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
   parameters:
-    SchoolId: {name: X-School-Id, in: header, required: false, schema: {type: integer}, description: "Selector only; must match an active membership, else 403 school_not_resolved. Required if user belongs to several schools."}
+    SchoolId:
+      name: X-School-Id
+      in: header
+      required: false
+      schema:
+        type: integer
+      description: Selector only; must match an active membership, else 403 school_not_resolved.
   responses:
-    Forbidden: {description: Not permitted / school not resolved}
-    Invalid: {description: Validation error, content: {application/json: {schema: {type: object, properties: {message: {type: string}, errors: {type: object}}}}}}
-security: [{bearer: []}]
+    Forbidden:
+      description: Not permitted / school not resolved
+    Invalid:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              errors:
+                type: object
 paths:
-  /auth/login: {post: {security: [], summary: Login (throttled 5/min per login+IP), requestBody: {content: {application/json: {schema: {type: object, required: [login, password], properties: {login: {type: string}, password: {type: string}, device_name: {type: string}}}}}}, responses: {'200': {description: "{token,user}"}, '422': {description: Invalid credentials}, '429': {description: Throttled}}}}
-  /auth/me: {get: {summary: Current user and memberships, responses: {'200': {description: ok}}}}
-  /auth/logout: {post: {summary: Revoke current token, responses: {'200': {description: ok}}}}
-  /auth/forgot-password: {post: {security: [], summary: Always 200, responses: {'200': {description: ok}}}}
-  /auth/reset-password: {post: {security: [], summary: Reset and revoke all tokens, responses: {'200': {description: ok}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /schools/register: {post: {security: [], summary: Organisation sign-up -> pending approval request, responses: {'201': {description: created}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /schools/my-request: {get: {summary: Status of own registration, responses: {'200': {description: ok}}}}
-  /schools/my-request/resubmit: {post: {summary: Resubmit after needs_changes, responses: {'200': {description: ok}}}}
-  /platform/approval-requests: {get: {summary: "List (filter status) — super_admin", responses: {'200': {description: paginated}}}}
-  /platform/approval-requests/{id}/decision: {post: {summary: "decision=approve|reject|needs_changes (note required unless approve)", parameters: [{name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}, '422': {description: Already decided / invalid}}}}
-  /platform/schools: {get: {summary: List schools (q,status), responses: {'200': {description: paginated}}}}
-  /platform/schools/{id}/suspend: {post: {summary: Suspend with reason, parameters: [{name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}}
-  /platform/schools/{id}/reactivate: {post: {summary: Reactivate, parameters: [{name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}}
-  /platform/schools/{id}/subscription: {patch: {summary: Plan limits, parameters: [{name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}}
-  /academics/{resource}: {get: {summary: "List. resource ∈ academic-years|grades|subjects|sections|students|calendar-events. perm academics.view. Params q,status,grade_id,academic_year_id,per_page", parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: resource, in: path, required: true, schema: {type: string}}], responses: {'200': {description: paginated}, '403': {$ref: '#/components/responses/Forbidden'}}}, post: {summary: Create (academics.manage; students limited by subscription), parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: resource, in: path, required: true, schema: {type: string}}], responses: {'201': {description: created}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /academics/{resource}/{id}: {get: {summary: Show, parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: resource, in: path, required: true, schema: {type: string}}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}, '404': {description: Missing or other school}}}, patch: {summary: Update, parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: resource, in: path, required: true, schema: {type: string}}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}, delete: {summary: "Delete; 409 if dependents exist; years/students are archived not deleted", parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: resource, in: path, required: true, schema: {type: string}}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'204': {description: deleted}, '409': {description: Blocked}}}}
-  /teachers: {get: {summary: List, parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'200': {description: ok}}}, post: {summary: Create teacher account + membership (people.manage), parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'201': {description: created}}}}
-  /teacher-assignments: {get: {summary: List, parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'200': {description: ok}}}, post: {summary: "Assign teacher to section+subject (one teacher per pair; grade must match)", parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'201': {description: created}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /enrollments: {get: {summary: List, parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'200': {description: ok}}}, post: {summary: "Enrol or transfer (idempotent; capacity enforced)", parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'201': {description: enrolled}, '200': {description: already/transferred}, '422': {description: Capacity full}}}}
-  /students/{id}/guardians: {post: {summary: Create/link guardian (approved by staff), parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'201': {description: linked}}}}
-  /students/{id}/guardians/{guardianId}: {delete: {summary: Revoke link, parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}, {name: guardianId, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: revoked}}}}
-  /me/children: {get: {summary: Guardian's approved children only, parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'200': {description: ok}}}}
-  /timetables: {get: {summary: List (schedule.view), parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'200': {description: ok}}}, post: {summary: "Create draft with periods (kind lesson|break|prep; HH:MM; ordered, non-overlapping)", parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'201': {description: created}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /timetables/{id}: {get: {summary: Show with periods and entries, parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}}
-  /timetables/{id}/check: {post: {summary: "Dry-run conflicts -> {ok, conflicts[{code,message}]}", parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}}
-  /timetables/{id}/entries: {post: {summary: "Add entry; 422 on section_busy|teacher_busy|not_assigned|teacher_mismatch|non_working_day|bad_period", parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'201': {description: created}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /timetables/{id}/entries/{entryId}: {delete: {summary: Remove entry, parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}, {name: entryId, in: path, required: true, schema: {type: integer}}], responses: {'204': {description: removed}}}}
-  /timetables/{id}/activate: {post: {summary: Activate (archives previous, notifies affected users once), parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'200': {description: ok}}}}
-  /substitutions: {post: {summary: "Substitute or cancel one occurrence on a date", parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'201': {description: ok}, '422': {$ref: '#/components/responses/Invalid'}}}}
-  /me/schedule: {get: {summary: "Own weekly schedule (teacher or student) + server_time", parameters: [{$ref: '#/components/parameters/SchoolId'}], responses: {'200': {description: ok}}}}
-  /me/notifications: {get: {summary: "Incremental feed; pass since_id after reconnect", parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: since_id, in: query, schema: {type: integer}}], responses: {'200': {description: "{data,server_time}"}}}}
-  /me/notifications/{id}/read: {post: {summary: Mark read, parameters: [{$ref: '#/components/parameters/SchoolId'}, {name: id, in: path, required: true, schema: {type: integer}}], responses: {'204': {description: ok}}}}
+  /academics/{resource}:
+    get:
+      tags:
+      - academics
+      summary: List. resource ∈ academic-years|grades|subjects|sections|students|calendar-events. perm academics.view. Params q,status,grade_id,academic_year_id,per_page
+      responses:
+        '200':
+          description: paginated
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      description: 'Permission (any of): academics.view'
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - academics
+      summary: Create (academics.manage; students limited by subscription)
+      responses:
+        '201':
+          description: created
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): academics.manage'
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /academics/{resource}/{id}:
+    get:
+      tags:
+      - academics
+      summary: Show
+      responses:
+        '200':
+          description: ok
+        '404':
+          description: Missing or other school
+      description: 'Permission (any of): academics.view'
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    patch:
+      tags:
+      - academics
+      summary: Update
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): academics.manage'
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    delete:
+      tags:
+      - academics
+      summary: Delete; 409 if dependents exist; years/students are archived not deleted
+      responses:
+        '204':
+          description: deleted
+        '409':
+          description: Blocked
+      description: 'Permission (any of): academics.manage'
+      parameters:
+      - name: resource
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/admin/summary:
+    post:
+      tags:
+      - ai
+      summary: AiController@adminSummary
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_admin
+
+        Throttle: 10,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/ask:
+    post:
+      tags:
+      - ai
+      summary: AiController@ask
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 20,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/my-data:
+    delete:
+      tags:
+      - ai
+      summary: AiController@eraseMine
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/speak:
+    post:
+      tags:
+      - ai
+      summary: AiController@speak
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 10,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/status:
+    get:
+      tags:
+      - ai
+      summary: AiController@status
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/teacher/answers/{answerId}/grade-suggestion:
+    post:
+      tags:
+      - ai
+      summary: AiController@gradeSuggestion
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_teacher
+
+        Throttle: 20,1'
+      parameters:
+      - name: answerId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/teacher/lesson-plan:
+    post:
+      tags:
+      - ai
+      summary: AiController@lessonPlan
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_teacher
+
+        Throttle: 20,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/teacher/questions:
+    post:
+      tags:
+      - ai
+      summary: AiController@generateQuestions
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_teacher
+
+        Throttle: 20,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/teacher/remedial:
+    post:
+      tags:
+      - ai
+      summary: AiController@remedial
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_teacher
+
+        Throttle: 20,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/teacher/rubric:
+    post:
+      tags:
+      - ai
+      summary: AiController@rubric
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_teacher
+
+        Throttle: 20,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/transcribe:
+    post:
+      tags:
+      - ai
+      summary: AiController@transcribe
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 10,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /ai/usage:
+    get:
+      tags:
+      - ai
+      summary: AiController@usage
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): ai.use_admin'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /analytics/attention:
+    get:
+      tags:
+      - analytics
+      summary: AnalyticsController@attention
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): attendance.view_all'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /analytics/overview:
+    get:
+      tags:
+      - analytics
+      summary: AnalyticsController@overview
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): attendance.view_all'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /analytics/students/{studentId}/progress:
+    get:
+      tags:
+      - analytics
+      summary: AnalyticsController@studentProgress
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /analytics/teachers:
+    get:
+      tags:
+      - analytics
+      summary: AnalyticsController@teachers
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): attendance.view_all'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /announcements:
+    get:
+      tags:
+      - announcements
+      summary: SchoolAdminController@announcements
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - announcements
+      summary: SchoolAdminController@publishAnnouncement
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): announcements.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments:
+    get:
+      tags:
+      - assignments
+      summary: AssignmentController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - assignments
+      summary: AssignmentController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments/{id}:
+    get:
+      tags:
+      - assignments
+      summary: AssignmentController@show
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments/{id}/close:
+    post:
+      tags:
+      - assignments
+      summary: AssignmentController@close
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments/{id}/draft:
+    put:
+      tags:
+      - assignments
+      summary: AssignmentController@saveDraft
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): learn.participate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments/{id}/publish:
+    post:
+      tags:
+      - assignments
+      summary: AssignmentController@publish
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments/{id}/submissions:
+    get:
+      tags:
+      - assignments
+      summary: AssignmentController@submissions
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /assignments/{id}/submit:
+    post:
+      tags:
+      - assignments
+      summary: AssignmentController@submit
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): learn.participate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /attendance:
+    get:
+      tags:
+      - attendance
+      summary: AttendanceController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /attendance/lesson:
+    post:
+      tags:
+      - attendance
+      summary: AttendanceController@recordForEntry
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): attendance.take'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /attendance/students/{studentId}/summary:
+    get:
+      tags:
+      - attendance
+      summary: AttendanceController@summary
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /auth/forgot-password:
+    post:
+      tags:
+      - auth
+      summary: Always 200
+      responses:
+        '200':
+          description: ok
+      description: 'Throttle: 6,1'
+      security: []
+  /auth/login:
+    post:
+      tags:
+      - auth
+      summary: Login (throttled 5/min per login+IP)
+      responses:
+        '200':
+          description: '{token,user}'
+        '422':
+          description: Invalid credentials
+        '429':
+          description: Throttled
+      description: 'Throttle: login'
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - login
+              - password
+              properties:
+                login:
+                  type: string
+                password:
+                  type: string
+                device_name:
+                  type: string
+  /auth/logout:
+    post:
+      tags:
+      - auth
+      summary: Revoke current token
+      responses:
+        '200':
+          description: ok
+  /auth/me:
+    get:
+      tags:
+      - auth
+      summary: Current user and memberships
+      responses:
+        '200':
+          description: ok
+  /auth/reset-password:
+    post:
+      tags:
+      - auth
+      summary: Reset and revoke all tokens
+      responses:
+        '200':
+          description: ok
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 6,1'
+      security: []
+  /broadcasting/auth:
+    get:
+      tags:
+      - broadcasting
+      summary: BroadcastController@authenticate
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+    post:
+      tags:
+      - broadcasting
+      summary: BroadcastController@authenticate
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+  /contacts:
+    get:
+      tags:
+      - contacts
+      summary: MessagingController@contacts
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /conversations:
+    get:
+      tags:
+      - conversations
+      summary: MessagingController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /conversations/direct:
+    post:
+      tags:
+      - conversations
+      summary: MessagingController@direct
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /conversations/{id}/lock:
+    put:
+      tags:
+      - conversations
+      summary: MessagingController@lock
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /conversations/{id}/messages:
+    get:
+      tags:
+      - conversations
+      summary: MessagingController@messages
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - conversations
+      summary: MessagingController@send
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use
+
+        Throttle: 40,1'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /conversations/{id}/participants:
+    get:
+      tags:
+      - conversations
+      summary: MessagingController@participants
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /enrollments:
+    get:
+      tags:
+      - enrollments
+      summary: List
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): academics.view'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - enrollments
+      summary: Enrol or transfer (idempotent; capacity enforced)
+      responses:
+        '201':
+          description: enrolled
+        '200':
+          description: already/transferred
+        '422':
+          description: Capacity full
+      description: 'Permission (any of): academics.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /exam-answers/{id}/grade:
+    put:
+      tags:
+      - exam-answers
+      summary: ExamController@gradeAnswer
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exam-attempts/{id}:
+    get:
+      tags:
+      - exam-attempts
+      summary: ExamController@attempt
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): learn.participate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exam-attempts/{id}/answers:
+    put:
+      tags:
+      - exam-attempts
+      summary: ExamController@saveAnswers
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): learn.participate
+
+        Throttle: 240,1'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exam-attempts/{id}/detail:
+    get:
+      tags:
+      - exam-attempts
+      summary: ExamController@attemptDetail
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exam-attempts/{id}/submit:
+    post:
+      tags:
+      - exam-attempts
+      summary: ExamController@submit
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): learn.participate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exams:
+    post:
+      tags:
+      - exams
+      summary: ExamController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    get:
+      tags:
+      - exams
+      summary: ExamController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /exams/{id}/analysis:
+    get:
+      tags:
+      - exams
+      summary: ExamController@analysis
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exams/{id}/attempts:
+    get:
+      tags:
+      - exams
+      summary: ExamController@attempts
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exams/{id}/my-result:
+    get:
+      tags:
+      - exams
+      summary: ExamController@myResult
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exams/{id}/publish:
+    post:
+      tags:
+      - exams
+      summary: ExamController@publish
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exams/{id}/release:
+    post:
+      tags:
+      - exams
+      summary: ExamController@release
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exams/{id}/start:
+    post:
+      tags:
+      - exams
+      summary: ExamController@start
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): learn.participate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /exports/{type}:
+    get:
+      tags:
+      - exports
+      summary: ImportController@export
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): data.export
+
+        Throttle: 10,1'
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /files:
+    post:
+      tags:
+      - files
+      summary: FileController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 60,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /files/{id}:
+    delete:
+      tags:
+      - files
+      summary: FileController@destroy
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /files/{id}/download:
+    get:
+      tags:
+      - files
+      summary: FileController@download
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 120,1'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      security: []
+  /files/{id}/link:
+    get:
+      tags:
+      - files
+      summary: FileController@link
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /grades:
+    get:
+      tags:
+      - grades
+      summary: GradeController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - grades
+      summary: GradeController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): grades.enter, grades.approve'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /grades/approve-bulk:
+    post:
+      tags:
+      - grades
+      summary: GradeController@approveBulk
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): grades.approve'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /grades/students/{studentId}/summary:
+    get:
+      tags:
+      - grades
+      summary: GradeController@studentSummary
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /grades/{id}:
+    patch:
+      tags:
+      - grades
+      summary: GradeController@update
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): grades.enter, grades.approve'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /grades/{id}/approve:
+    post:
+      tags:
+      - grades
+      summary: GradeController@approve
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): grades.approve'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /grades/{id}/history:
+    get:
+      tags:
+      - grades
+      summary: GradeController@history
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): grades.enter, grades.approve'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /grading/rules:
+    get:
+      tags:
+      - grading
+      summary: GradeController@rules
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    put:
+      tags:
+      - grading
+      summary: GradeController@updateRules
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): grades.approve'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /imports/{type}:
+    post:
+      tags:
+      - imports
+      summary: ImportController@import
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): data.import
+
+        Throttle: 10,1'
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /imports/{type}/template:
+    get:
+      tags:
+      - imports
+      summary: ImportController@template
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): data.import'
+      parameters:
+      - name: type
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /materials:
+    get:
+      tags:
+      - materials
+      summary: MaterialController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - materials
+      summary: MaterialController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /materials/{id}:
+    delete:
+      tags:
+      - materials
+      summary: MaterialController@destroy
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /me/child-teachers:
+    get:
+      tags:
+      - me
+      summary: GuardianController@childTeachers
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): guardian.access'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /me/children:
+    get:
+      tags:
+      - me
+      summary: Guardian's approved children only
+      responses:
+        '200':
+          description: ok
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /me/devices:
+    post:
+      tags:
+      - me
+      summary: PreferenceController@registerDevice
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    delete:
+      tags:
+      - me
+      summary: PreferenceController@removeDevice
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /me/notification-preferences:
+    get:
+      tags:
+      - me
+      summary: PreferenceController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    put:
+      tags:
+      - me
+      summary: PreferenceController@update
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /me/notifications:
+    get:
+      tags:
+      - me
+      summary: Incremental feed; pass since_id after reconnect
+      responses:
+        '200':
+          description: '{data,server_time}'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /me/notifications/{id}/read:
+    post:
+      tags:
+      - me
+      summary: Mark read
+      responses:
+        '204':
+          description: ok
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /me/schedule:
+    get:
+      tags:
+      - me
+      summary: Own weekly schedule (teacher or student) + server_time
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): schedule.own'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /me/teaching:
+    get:
+      tags:
+      - me
+      summary: AssignmentController@mine
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /media/status:
+    get:
+      tags:
+      - media
+      summary: SessionController@media
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /meetings:
+    get:
+      tags:
+      - meetings
+      summary: MeetingController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - meetings
+      summary: MeetingController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): guardian.access'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /meetings/{id}/respond:
+    put:
+      tags:
+      - meetings
+      summary: MeetingController@respond
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /messages/{id}/report:
+    post:
+      tags:
+      - messages
+      summary: MessagingController@report
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.use'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /moderation/reports:
+    get:
+      tags:
+      - moderation
+      summary: MessagingController@reports
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.moderate'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /moderation/reports/{id}:
+    get:
+      tags:
+      - moderation
+      summary: MessagingController@reportShow
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.moderate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /moderation/reports/{id}/resolve:
+    post:
+      tags:
+      - moderation
+      summary: MessagingController@reportResolve
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): messaging.moderate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /platform/announcements:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@announcements
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+    post:
+      tags:
+      - platform
+      summary: PlatformController@publishAnnouncement
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/approval-requests:
+    get:
+      tags:
+      - platform
+      summary: List (filter status) — super_admin
+      responses:
+        '200':
+          description: paginated
+      description: 'Platform role: super_admin'
+  /platform/approval-requests/{approvalRequest}/decision:
+    post:
+      tags:
+      - platform
+      summary: PlatformSchoolController@decide
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+      parameters:
+      - name: approvalRequest
+        in: path
+        required: true
+        schema:
+          type: string
+  /platform/audit:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@audit
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/health:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@health
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/operators:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@operators
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+    post:
+      tags:
+      - platform
+      summary: PlatformController@createOperator
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/operators/{id}:
+    patch:
+      tags:
+      - platform
+      summary: PlatformController@updateOperator
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /platform/schools:
+    get:
+      tags:
+      - platform
+      summary: List schools (q
+      responses:
+        '200':
+          description: paginated
+      description: 'Platform role: super_admin'
+      status): null
+  /platform/schools/{school}/reactivate:
+    post:
+      tags:
+      - platform
+      summary: PlatformSchoolController@reactivate
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+      parameters:
+      - name: school
+        in: path
+        required: true
+        schema:
+          type: string
+  /platform/schools/{school}/subscription:
+    patch:
+      tags:
+      - platform
+      summary: PlatformSchoolController@updateSubscription
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+      parameters:
+      - name: school
+        in: path
+        required: true
+        schema:
+          type: string
+  /platform/schools/{school}/suspend:
+    post:
+      tags:
+      - platform
+      summary: PlatformSchoolController@suspend
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+      parameters:
+      - name: school
+        in: path
+        required: true
+        schema:
+          type: string
+  /platform/settings:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@settings
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+    patch:
+      tags:
+      - platform
+      summary: PlatformController@updateSettings
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/stats:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@stats
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/support/tickets:
+    get:
+      tags:
+      - platform
+      summary: SupportController@platformIndex
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin,support'
+  /platform/support/tickets/{id}:
+    get:
+      tags:
+      - platform
+      summary: SupportController@platformShow
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin,support'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /platform/support/tickets/{id}/reply:
+    post:
+      tags:
+      - platform
+      summary: SupportController@platformReply
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin,support'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /questions:
+    get:
+      tags:
+      - questions
+      summary: QuestionController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - questions
+      summary: QuestionController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /questions/{id}:
+    patch:
+      tags:
+      - questions
+      summary: QuestionController@update
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    delete:
+      tags:
+      - questions
+      summary: QuestionController@destroy
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): exams.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /report-card-templates:
+    get:
+      tags:
+      - report-card-templates
+      summary: ReportCardController@templates
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - report-card-templates
+      summary: ReportCardController@storeTemplate
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /report-card-templates/{id}:
+    patch:
+      tags:
+      - report-card-templates
+      summary: ReportCardController@updateTemplate
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards:
+    get:
+      tags:
+      - report-cards
+      summary: ReportCardController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards/generate:
+    post:
+      tags:
+      - report-cards
+      summary: ReportCardController@generate
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards/issue-section:
+    post:
+      tags:
+      - report-cards
+      summary: ReportCardController@issueSection
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards/{id}:
+    get:
+      tags:
+      - report-cards
+      summary: ReportCardController@show
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards/{id}/issue:
+    post:
+      tags:
+      - report-cards
+      summary: ReportCardController@issue
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards/{id}/pdf:
+    get:
+      tags:
+      - report-cards
+      summary: ReportCardController@pdf
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /report-cards/{id}/revoke:
+    post:
+      tags:
+      - report-cards
+      summary: ReportCardController@revoke
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): reportcards.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /school/audit:
+    get:
+      tags:
+      - school
+      summary: SchoolAdminController@audit
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): audit.view'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /school/profile:
+    get:
+      tags:
+      - school
+      summary: SchoolAdminController@profile
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    patch:
+      tags:
+      - school
+      summary: SchoolAdminController@updateProfile
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): school.settings'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /school/settings:
+    patch:
+      tags:
+      - school
+      summary: SchoolAdminController@updateSettings
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): school.settings'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /schools/my-request:
+    get:
+      tags:
+      - schools
+      summary: Status of own registration
+      responses:
+        '200':
+          description: ok
+  /schools/my-request/resubmit:
+    post:
+      tags:
+      - schools
+      summary: Resubmit after needs_changes
+      responses:
+        '200':
+          description: ok
+  /schools/register:
+    post:
+      tags:
+      - schools
+      summary: Organisation sign-up -> pending approval request
+      responses:
+        '201':
+          description: created
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: school-register'
+      security: []
+  /sessions:
+    get:
+      tags:
+      - sessions
+      summary: SessionController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - sessions
+      summary: SessionController@storeExtra
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/report:
+    get:
+      tags:
+      - sessions
+      summary: SessionController@report
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.monitor'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/start-lesson:
+    post:
+      tags:
+      - sessions
+      summary: SessionController@startForEntry
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}:
+    get:
+      tags:
+      - sessions
+      summary: SessionController@show
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/end:
+    post:
+      tags:
+      - sessions
+      summary: SessionController@end
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/hand:
+    put:
+      tags:
+      - sessions
+      summary: SessionController@hand
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/issues:
+    post:
+      tags:
+      - sessions
+      summary: SessionController@issue
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/join:
+    post:
+      tags:
+      - sessions
+      summary: SessionController@join
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 60,1'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/leave:
+    post:
+      tags:
+      - sessions
+      summary: SessionController@leave
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/participants/{userId}:
+    delete:
+      tags:
+      - sessions
+      summary: SessionController@kick
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/participants/{userId}/mute:
+    put:
+      tags:
+      - sessions
+      summary: SessionController@mute
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/recording:
+    put:
+      tags:
+      - sessions
+      summary: SessionController@recording
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/start:
+    post:
+      tags:
+      - sessions
+      summary: SessionController@start
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{id}/whiteboard:
+    get:
+      tags:
+      - sessions
+      summary: SessionController@whiteboardIndex
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - sessions
+      summary: SessionController@whiteboardStore
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): sessions.host'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /sessions/{sessionId}/attendance:
+    put:
+      tags:
+      - sessions
+      summary: AttendanceController@recordForSession
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): attendance.take'
+      parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /staff:
+    get:
+      tags:
+      - staff
+      summary: StaffController@index
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): school.settings'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - staff
+      summary: StaffController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): school.settings'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /staff/{membershipId}:
+    patch:
+      tags:
+      - staff
+      summary: StaffController@update
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): school.settings'
+      parameters:
+      - name: membershipId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/account:
+    post:
+      tags:
+      - students
+      summary: GuardianController@createAccount
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): people.manage'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/guardians:
+    post:
+      tags:
+      - students
+      summary: GuardianController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): people.manage'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/guardians/{guardianId}:
+    delete:
+      tags:
+      - students
+      summary: GuardianController@revoke
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): people.manage'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: guardianId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/notes:
+    get:
+      tags:
+      - students
+      summary: SchoolAdminController@notes
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - students
+      summary: SchoolAdminController@addNote
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/schedule:
+    get:
+      tags:
+      - students
+      summary: TimetableController@ofStudent
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /submissions/{id}/grade:
+    post:
+      tags:
+      - submissions
+      summary: AssignmentController@grade
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /submissions/{id}/history:
+    get:
+      tags:
+      - submissions
+      summary: AssignmentController@history
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): content.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /substitutions:
+    post:
+      tags:
+      - substitutions
+      summary: Substitute or cancel one occurrence on a date
+      responses:
+        '201':
+          description: ok
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): schedule.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /support/grants:
+    get:
+      tags:
+      - support
+      summary: SupportController@grants
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): support.grant'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - support
+      summary: SupportController@grant
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): support.grant'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /support/grants/{id}:
+    delete:
+      tags:
+      - support
+      summary: SupportController@revoke
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): support.grant'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /support/tickets:
+    get:
+      tags:
+      - support
+      summary: SupportController@mine
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - support
+      summary: SupportController@store
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Throttle: 10,1'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /support/tickets/{id}:
+    get:
+      tags:
+      - support
+      summary: SupportController@show
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /support/tickets/{id}/reply:
+    post:
+      tags:
+      - support
+      summary: SupportController@reply
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /teacher-assignments:
+    get:
+      tags:
+      - teacher-assignments
+      summary: List
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): academics.view'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - teacher-assignments
+      summary: Assign teacher to section+subject (one teacher per pair; grade must match)
+      responses:
+        '201':
+          description: created
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): academics.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /teacher-assignments/{id}:
+    delete:
+      tags:
+      - teacher-assignments
+      summary: AssignmentController@destroy
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): academics.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /teachers:
+    get:
+      tags:
+      - teachers
+      summary: List
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): academics.view'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - teachers
+      summary: Create teacher account + membership (people.manage)
+      responses:
+        '201':
+          description: created
+      description: 'Permission (any of): people.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /timetables:
+    get:
+      tags:
+      - timetables
+      summary: List (schedule.view)
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): schedule.view'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+    post:
+      tags:
+      - timetables
+      summary: Create draft with periods (kind lesson|break|prep; HH:MM; ordered, non-overlapping)
+      responses:
+        '201':
+          description: created
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): schedule.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
+  /timetables/{id}:
+    get:
+      tags:
+      - timetables
+      summary: Show with periods and entries
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): schedule.view'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /timetables/{id}/activate:
+    post:
+      tags:
+      - timetables
+      summary: Activate (archives previous
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): schedule.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+      notifies affected users once): null
+  /timetables/{id}/check:
+    post:
+      tags:
+      - timetables
+      summary: Dry-run conflicts -> {ok, conflicts[{code,message}]}
+      responses:
+        '200':
+          description: ok
+      description: 'Permission (any of): schedule.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /timetables/{id}/entries:
+    post:
+      tags:
+      - timetables
+      summary: Add entry; 422 on section_busy|teacher_busy|not_assigned|teacher_mismatch|non_working_day|bad_period
+      responses:
+        '201':
+          description: created
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): schedule.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /timetables/{id}/entries/{entryId}:
+    delete:
+      tags:
+      - timetables
+      summary: Remove entry
+      responses:
+        '204':
+          description: removed
+      description: 'Permission (any of): schedule.manage'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: entryId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /webhooks/livekit:
+    post:
+      tags:
+      - webhooks
+      summary: WebhookController@livekit
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      security: []

@@ -1,0 +1,16 @@
+# NOT executed in the authoring environment (no Docker daemon) — verify on first build.
+# Builds the Flutter web client and serves it with nginx (SPA fallback + /api and /app proxies, see nginx.conf).
+FROM ghcr.io/cirruslabs/flutter:stable AS build
+WORKDIR /src
+COPY frontend/ .
+ARG API_BASE=/api/v1
+ARG REVERB_HOST
+ARG REVERB_PORT=443
+ARG REVERB_KEY
+RUN flutter pub get && flutter build web --release \
+    --dart-define=API_BASE=${API_BASE} --dart-define=REVERB_HOST=${REVERB_HOST} \
+    --dart-define=REVERB_PORT=${REVERB_PORT} --dart-define=REVERB_KEY=${REVERB_KEY}
+
+FROM nginx:1.27-alpine
+COPY infra/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /src/build/web /usr/share/nginx/html
