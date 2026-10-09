@@ -32,6 +32,9 @@ class NotificationService
             $inserted += DB::table('notifications_outbox')->insertOrIgnore($chunk);
         }
 
+        // Fan-out happens off the request path; the outbox row is already durable.
+        $inserted > 0 && \App\Jobs\DispatchNotifications::dispatch($schoolId)->afterCommit();
+
         return $inserted;
     }
 

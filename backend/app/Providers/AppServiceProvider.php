@@ -14,6 +14,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // scoped(): reset per request / per queued job, so tenant state never leaks between them.
         $this->app->scoped(CurrentSchool::class);
+        $this->app->scoped(\App\Modules\Tenancy\Access::class);
+        $this->app->bind(\App\Modules\VirtualClassrooms\Media\MediaProvider::class, fn () => \App\Modules\VirtualClassrooms\Media\MediaManager::make());
     }
 
     public function boot(): void

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Scheduling;
 
+use App\Models\LessonSession;
 use App\Models\School;
 use App\Models\ScheduleEvent;
 use App\Models\Substitution;
@@ -10,6 +11,7 @@ use App\Models\TimetableEntry;
 use App\Models\TimetablePeriod;
 use App\Modules\Notifications\NotificationService;
 use App\Modules\Tenancy\CurrentSchool;
+use App\Modules\VirtualClassrooms\LessonSessionService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -40,8 +42,10 @@ class BellEngine
 
         return $this->current->run($school, function () use ($school, $now) {
             $this->generate($school, $now);
+            $fired = $this->tick($school, $now);
+            $this->autoCloseOverrun($now);
 
-            return $this->tick($school, $now);
+            return $fired;
         });
     }
 
@@ -108,11 +112,17 @@ class BellEngine
                 $teacherId = $sub?->substitute_teacher_id ?? $entry->teacher_id;
                 $users = collect(Recipients::forSection($school->id, $entry->section_id))->push(Recipients::teacherUser($teacherId))->filter();
                 $subject = DB::table('subjects')->where('id', $entry->subject_id)->value('name');
+                $sessions = app(LessonSessionService::class);
+                $session = $isStart ? $sessions->ensureForEntry($entry, $date, $period)
+                    : LessonSession::where('timetable_entry_id', $entry->id)->whereDate('on_date', $date)->first();
+                if (! $isStart && $session) {
+                    $sessions->onPeriodEnd($session);   // unstarted class => "not held" + report to managers
+                }
 
                 $sent += $this->notify->send(
                     $users, $isStart ? 'bell.lesson_start' : 'bell.lesson_end', "bell:{$event->id}:{$entry->id}",
                     $isStart ? "شروع {$period->title}: {$subject}" : "پایان {$period->title}: {$subject}", null,
-                    ['period_id' => $period->id, 'entry_id' => $entry->id, 'section_id' => $entry->section_id, 'fires_at' => $event->fires_at->toIso8601String()],
+                    ['period_id' => $period->id, 'entry_id' => $entry->id, 'section_id' => $entry->section_id, 'session_id' => $session?->id, 'fires_at' => $event->fires_at->toIso8601String()],
                 );
             }
 
@@ -130,6 +140,14 @@ class BellEngine
         }
 
         return $this->notify->send($users->filter(), 'bell.break_start', "bell:{$event->id}", $period->title, null, ['period_id' => $period->id]);
+    }
+
+    /** A class left running long after its period ended is closed (attendance is finalised). */
+    private function autoCloseOverrun(CarbonInterface $now): void
+    {
+        $svc = app(LessonSessionService::class);
+        LessonSession::where('status', 'live')->where('scheduled_end', '<', Carbon::instance($now)->subMinutes(20))->get()
+            ->each(fn ($s) => $svc->finish($s, 'ended'));
     }
 
     private function isClassCancelled(CarbonInterface $local): bool

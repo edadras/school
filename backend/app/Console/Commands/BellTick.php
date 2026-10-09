@@ -24,6 +24,7 @@ class BellTick extends Command
                 $this->error("school {$school->id}: {$e->getMessage()}");
             }
         });
+        \Illuminate\Support\Facades\Cache::put('bell:last_tick', now()->toIso8601String(), 3600);
         $this->info("fired events: $total");
 
         return self::SUCCESS;

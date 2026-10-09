@@ -1,0 +1,141 @@
+<?php
+
+namespace App\Modules\VirtualClassrooms\Media;
+
+use Illuminate\Support\Facades\Http;
+
+/**
+ * LiveKit (open-source SFU) adapter: access tokens are signed locally (HS256),
+ * room administration uses the server-side Twirp API, TURN credentials follow the coturn REST scheme.
+ */
+class LiveKitProvider implements MediaProvider
+{
+    public function __construct(private array $cfg, private array $turn = []) {}
+
+    public function name(): string
+    {
+        return 'livekit';
+    }
+
+    public function isConfigured(): bool
+    {
+        return filled($this->cfg['url'] ?? null) && filled($this->cfg['key'] ?? null) && filled($this->cfg['secret'] ?? null);
+    }
+
+    public function health(): array
+    {
+        if (! $this->isConfigured()) {
+            return ['ok' => false, 'detail' => 'missing LIVEKIT_* settings'];
+        }
+        try {
+            $r = $this->twirp('ListRooms', [], ['roomList' => true]);
+
+            return ['ok' => $r->successful(), 'detail' => 'HTTP '.$r->status()];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'detail' => $e->getMessage()];
+        }
+    }
+
+    public function createRoom(string $room, int $maxParticipants): void
+    {
+        $this->twirp('CreateRoom', ['name' => $room, 'max_participants' => $maxParticipants, 'empty_timeout' => 600], ['roomCreate' => true])->throw();
+    }
+
+    public function joinToken(string $room, string $identity, string $displayName, string $role): array
+    {
+        $host = $role === 'host';
+        $observer = $role === 'observer';
+        $grant = [
+            'room' => $room, 'roomJoin' => true,
+            'canSubscribe' => true,
+            // Students may publish mic/camera; the host can mute them. Observers (school monitors) are receive-only.
+            'canPublish' => ! $observer, 'canPublishData' => ! $observer,
+            'roomAdmin' => $host,
+        ];
+        $token = $this->jwt(['sub' => $identity, 'name' => $displayName, 'video' => $grant], (int) config('media.join_token_ttl'));
+
+        return ['url' => $this->cfg['url'], 'token' => $token, 'ice_servers' => $this->iceServers($identity)];
+    }
+
+    public function setMicrophoneMuted(string $room, string $identity, bool $muted): void
+    {
+        $p = $this->twirp('GetParticipant', ['room' => $room, 'identity' => $identity], ['roomAdmin' => true, 'room' => $room]);
+        $p->throw();
+        foreach ($p->json('tracks', []) as $track) {
+            if (($track['type'] ?? '') === 'AUDIO' || ($track['source'] ?? '') === 'MICROPHONE') {
+                $this->twirp('MutePublishedTrack', ['room' => $room, 'identity' => $identity, 'track_sid' => $track['sid'], 'muted' => $muted], ['roomAdmin' => true, 'room' => $room])->throw();
+            }
+        }
+    }
+
+    public function removeParticipant(string $room, string $identity): void
+    {
+        $this->twirp('RemoveParticipant', ['room' => $room, 'identity' => $identity], ['roomAdmin' => true, 'room' => $room])->throw();
+    }
+
+    public function endRoom(string $room): void
+    {
+        $this->twirp('DeleteRoom', ['room' => $room], ['roomCreate' => true])->throw(fn ($r) => $r->status() !== 404);
+    }
+
+    /** LiveKit signs webhooks with a JWT whose `sha256` claim is the base64 SHA-256 of the body. */
+    public function parseWebhook(string $body, ?string $authorization): ?array
+    {
+        if (! $this->isConfigured() || ! $authorization) {
+            return null;
+        }
+        $claims = $this->verifyJwt(trim(preg_replace('/^Bearer\s+/i', '', $authorization)));
+        if (! $claims || ($claims['sha256'] ?? null) !== base64_encode(hash('sha256', $body, true))) {
+            return null;
+        }
+        $e = json_decode($body, true) ?: [];
+
+        return ['event' => $e['event'] ?? '', 'room' => $e['room']['name'] ?? null, 'identity' => $e['participant']['identity'] ?? null];
+    }
+
+    private function iceServers(string $identity): array
+    {
+        if (empty($this->turn['urls']) || empty($this->turn['secret'])) {
+            return [];
+        }
+        $user = (time() + (int) ($this->turn['ttl'] ?? 3600)).':'.$identity;
+
+        return [['urls' => array_values($this->turn['urls']), 'username' => $user,
+            'credential' => base64_encode(hash_hmac('sha1', $user, $this->turn['secret'], true))]];
+    }
+
+    private function twirp(string $method, array $body, array $grant)
+    {
+        $base = $this->cfg['api_url'] ?: preg_replace('#^ws#', 'http', (string) $this->cfg['url']);
+
+        return Http::withToken($this->jwt(['video' => $grant], 60))->acceptJson()->timeout(10)
+            ->post(rtrim($base, '/')."/twirp/livekit.RoomService/$method", (object) $body);
+    }
+
+    private function jwt(array $claims, int $ttl): string
+    {
+        $now = time();
+        $payload = ['iss' => $this->cfg['key'], 'nbf' => $now - 5, 'exp' => $now + $ttl] + $claims;
+        $enc = fn ($d) => rtrim(strtr(base64_encode(json_encode($d)), '+/', '-_'), '=');
+        $head = $enc(['alg' => 'HS256', 'typ' => 'JWT']);
+        $body = $enc($payload);
+        $sig = rtrim(strtr(base64_encode(hash_hmac('sha256', "$head.$body", $this->cfg['secret'], true)), '+/', '-_'), '=');
+
+        return "$head.$body.$sig";
+    }
+
+    private function verifyJwt(string $jwt): ?array
+    {
+        $parts = explode('.', $jwt);
+        if (count($parts) !== 3) {
+            return null;
+        }
+        $expected = rtrim(strtr(base64_encode(hash_hmac('sha256', "$parts[0].$parts[1]", $this->cfg['secret'], true)), '+/', '-_'), '=');
+        if (! hash_equals($expected, $parts[2])) {
+            return null;
+        }
+        $claims = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);
+
+        return is_array($claims) && ($claims['iss'] ?? null) === $this->cfg['key'] && ($claims['exp'] ?? 0) > time() ? $claims : null;
+    }
+}

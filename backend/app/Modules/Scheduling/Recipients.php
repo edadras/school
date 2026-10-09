@@ -23,6 +23,13 @@ class Recipients
         return $students->merge($guardians)->unique()->values()->all();
     }
 
+    /** Approved guardians' user ids for one student. */
+    public static function guardianUsers(int $studentId): array
+    {
+        return DB::table('student_guardians as sg')->join('guardians as g', 'g.id', '=', 'sg.guardian_id')
+            ->where('sg.student_id', $studentId)->where('sg.status', 'approved')->pluck('g.user_id')->all();
+    }
+
     public static function teacherUser(int $teacherId): ?int
     {
         return DB::table('teachers')->where('id', $teacherId)->value('user_id');

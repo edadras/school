@@ -22,6 +22,11 @@ class ResolveSchool
         $user = $request->user();
         abort_unless($user, 401);
 
+        // Platform support: only into a school whose admin granted time-limited access (read-only, audited).
+        if ($user->platform_role === 'support') {
+            return $this->supportAccess($request, $next);
+        }
+
         $memberships = $user->memberships()->where('status', 'active')
             ->whereHas('school', fn ($q) => $q->where('status', 'active'))
             ->with('school')->get();
@@ -40,6 +45,22 @@ class ResolveSchool
 
         $this->current->set($pick->school);
         $request->attributes->set('school_roles', $memberships->where('school_id', $pick->school_id)->pluck('role_id')->all());
+
+        return $next($request);
+    }
+
+    private function supportAccess(Request $request, Closure $next)
+    {
+        $schoolId = (int) $request->header('X-School-Id');
+        $grant = $schoolId ? \App\Models\SupportAccessGrant::withoutGlobalScopes()->where('school_id', $schoolId)->where('support_user_id', $request->user()->id)
+            ->whereNull('revoked_at')->where('expires_at', '>', now())->first() : null;
+        $school = $grant ? School::where('id', $schoolId)->where('status', 'active')->first() : null;
+        if (! $school) {
+            return response()->json(['message' => 'دسترسی پشتیبانی به این مدرسه فعال نیست.', 'code' => 'support_access_denied'], 403);
+        }
+        $this->current->set($school);
+        $request->attributes->set('support_access', true);
+        $this->current->run($school, fn () => \App\Modules\Audit\Audit::record('support.data_access', null, null, ['path' => $request->path(), 'grant' => $grant->id]));
 
         return $next($request);
     }
