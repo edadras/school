@@ -243,7 +243,17 @@ class _LiveScreenState extends ConsumerState<LiveScreen> with SingleTickerProvid
 
   List<lk.Participant> _all(lk.Room room) => [if (room.localParticipant != null) room.localParticipant!, ...room.remoteParticipants.values];
 
-  Widget _stage(lk.Room room) {
+  /// Everyone in the room must always see when the class is being recorded.
+  Widget _stage(lk.Room room) => Stack(children: [
+        Positioned.fill(child: _stageBody(room)),
+        if (_recording) Positioned(top: 10, left: 0, right: 0, child: Center(child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(color: Palette.danger, borderRadius: BorderRadius.circular(999)),
+          child: const Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.fiber_manual_record, color: Colors.white, size: 14), SizedBox(width: 6), Text('این کلاس در حال ضبط است', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))]),
+        ))),
+      ]);
+
+  Widget _stageBody(lk.Room room) {
     final parts = _all(room);
     final screen = parts.expand((p) => p.videoTrackPublications.where((t) => t.source == lk.TrackSource.screenShareVideo && t.track != null && !t.muted).map((t) => (p, t))).firstOrNull;
     if (screen != null) {

@@ -96,6 +96,7 @@ class LiveKitProvider implements MediaProvider
             'bucket' => $e['bucket'], 'force_path_style' => (bool) ($e['path_style'] ?? false)], fn ($v) => $v !== null && $v !== '');
         $r = $this->twirp('StartRoomCompositeEgress', [
             'room_name' => $room, 'layout' => 'speaker', 'audio_only' => false,
+        ] + (! empty($e['template_url']) ? ['custom_base_url' => $e['template_url']] : []) + [
             'file_outputs' => [['file_type' => 'MP4', 'filepath' => $filepath, 's3' => $s3]],
         ], ['roomRecord' => true], 'livekit.Egress');
         $r->throw();
