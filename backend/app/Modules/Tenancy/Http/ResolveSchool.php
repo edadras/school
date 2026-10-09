@@ -51,6 +51,12 @@ class ResolveSchool
 
     private function supportAccess(Request $request, Closure $next)
     {
+        // Read-only, and only structural data — never grades, attendance, messages, files or reports.
+        $allowed = ['academics/', 'teachers', 'teacher-assignments', 'enrollments', 'timetables', 'school/profile', 'media/status'];
+        $path = preg_replace('#^api/v1/#', '', $request->path());
+        if (! $request->isMethodSafe() || ! collect($allowed)->contains(fn ($p) => str_starts_with($path, $p))) {
+            return response()->json(['message' => 'دسترسی پشتیبانی به این بخش مجاز نیست.', 'code' => 'support_access_denied'], 403);
+        }
         $schoolId = (int) $request->header('X-School-Id');
         $grant = $schoolId ? \App\Models\SupportAccessGrant::withoutGlobalScopes()->where('school_id', $schoolId)->where('support_user_id', $request->user()->id)
             ->whereNull('revoked_at')->where('expires_at', '>', now())->first() : null;

@@ -40,7 +40,7 @@ class ImportService
         $header = null;
         foreach ($reader->getSheetIterator() as $sheet) {
             foreach ($sheet->getRowIterator() as $row) {
-                $cells = array_map(fn ($c) => trim((string) $c->getValue()), $row->getCells());
+                $cells = array_map(fn ($c) => trim((string) ($c->getValue() instanceof \DateTimeInterface ? $c->getValue()->format('Y-m-d') : $c->getValue())), $row->cells);
                 if ($header === null) {
                     $header = array_map(fn ($h) => strtolower(preg_replace('/^\xEF\xBB\xBF/', '', $h)), $cells);
                     continue;
@@ -98,7 +98,7 @@ class ImportService
                 continue;
             }
             try {
-                DB::transaction(function () use ($r, $section, $password) {
+                DB::transaction(function () use ($r, $section, $password, $by) {
                     $stu = Student::create(['student_code' => $r['student_code'], 'first_name' => $r['first_name'], 'last_name' => $r['last_name'], 'birth_date' => $r['birth_date'] ?: null]);
                     if ($section) {
                         Enrollment::create(['student_id' => $stu->id, 'section_id' => $section->id, 'academic_year_id' => $section->academic_year_id, 'enrolled_on' => today()]);

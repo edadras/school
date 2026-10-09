@@ -33,7 +33,9 @@ class ChannelAuth
             $s = LessonSession::find($sessionId);
             $access = app(Access::class);
 
-            return $s && ($access->canViewSection($u, $s->section_id) || $access->can($u, 'sessions.monitor'));
+            // Students of the class, its teachers and monitors — parents/guardians do not sit in lessons.
+            return $s && (($access->ownStudentId($u) && $access->canViewSection($u, $s->section_id))
+                || $access->canTeach($u, $s->section_id, $s->subject_id) && ! $access->isStaff($u) || $access->can($u, 'sessions.monitor'));
         });
     }
 

@@ -251,7 +251,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('grades', [GradeController::class, 'index']);
         Route::get('grades/students/{studentId}/summary', [GradeController::class, 'studentSummary'])->whereNumber('studentId');
         Route::get('grading/rules', [GradeController::class, 'rules']);
-        Route::middleware('perm:grades.enter')->group(function () {
+        Route::middleware('perm:grades.enter,grades.approve')->group(function () {
             Route::post('grades', [GradeController::class, 'store']);
             Route::patch('grades/{id}', [GradeController::class, 'update'])->whereNumber('id');
             Route::get('grades/{id}/history', [GradeController::class, 'history'])->whereNumber('id');
