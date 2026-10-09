@@ -38,6 +38,16 @@ class SchoolApprovalTest extends TestCase
         $this->as($owner, $school)->getJson('/api/v1/academics/grades')->assertForbidden();
     }
 
+    public function test_registration_can_be_closed_by_the_platform(): void
+    {
+        \App\Models\PlatformSetting::create(['key' => 'registration_open', 'value' => [false]]);
+        $this->postJson('/api/v1/schools/register', $this->registerPayload())->assertForbidden();
+        $this->assertDatabaseMissing('schools', ['code' => 'hope']);
+
+        \App\Models\PlatformSetting::where('key', 'registration_open')->update(['value' => json_encode([true])]);
+        $this->postJson('/api/v1/schools/register', $this->registerPayload())->assertCreated();
+    }
+
     public function test_super_admin_approves_and_school_becomes_usable(): void
     {
         $this->postJson('/api/v1/schools/register', $this->registerPayload())->assertCreated();

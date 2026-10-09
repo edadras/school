@@ -10,6 +10,8 @@ class FakeMediaProvider implements MediaProvider
 
     public static bool $configured = true;
 
+    public static bool $failEndRoom = false;
+
     public function name(): string
     {
         return 'fake';
@@ -49,6 +51,9 @@ class FakeMediaProvider implements MediaProvider
 
     public function endRoom(string $room): void
     {
+        if (self::$failEndRoom) {
+            throw new \RuntimeException('sfu down');
+        }
         self::$calls[] = ['endRoom', $room];
     }
 

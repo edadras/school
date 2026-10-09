@@ -75,7 +75,10 @@ class LiveKitProvider implements MediaProvider
 
     public function endRoom(string $room): void
     {
-        $this->twirp('DeleteRoom', ['room' => $room], ['roomCreate' => true])->throw(fn ($r) => $r->status() !== 404);
+        $r = $this->twirp('DeleteRoom', ['room' => $room], ['roomCreate' => true]);
+        if ($r->status() !== 404) {   // a room nobody ever joined does not exist on the SFU: that is already "ended"
+            $r->throw();
+        }
     }
 
     /** LiveKit signs webhooks with a JWT whose `sha256` claim is the base64 SHA-256 of the body. */

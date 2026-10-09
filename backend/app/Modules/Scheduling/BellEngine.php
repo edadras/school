@@ -81,7 +81,14 @@ class BellEngine
         foreach ($due as $event) {
             $stale = $event->fires_at->lt(Carbon::instance($now)->subMinutes(self::CATCH_UP_MINUTES));
 
-            $count = $stale ? 0 : $this->deliver($school, $event);
+            try {
+                $count = $stale ? 0 : $this->deliver($school, $event);
+            } catch (\Throwable $e) {
+                // One failing event (e.g. media server down) must not block the rest; it stays unprocessed and is retried next tick.
+                report($e);
+
+                continue;
+            }
 
             // Conditional update: only the first worker to finish records it; others no-op.
             ScheduleEvent::whereKey($event->id)->whereNull('processed_at')

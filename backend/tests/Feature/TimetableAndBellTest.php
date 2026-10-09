@@ -157,6 +157,30 @@ class TimetableAndBellTest extends TestCase
         $this->as($stu, $this->school)->getJson('/api/v1/me/notifications')->assertJsonFragment(['type' => 'bell.lesson_start'])->assertJsonStructure(['server_time']);
     }
 
+    public function test_unstarted_class_becomes_not_held_and_a_failing_media_server_does_not_block_the_bell(): void
+    {
+        $this->app->bind(\App\Modules\VirtualClassrooms\Media\MediaProvider::class, \Tests\Support\FakeMediaProvider::class);
+        [$id, $periods] = $this->createTimetable();
+        $this->postJson("/api/v1/timetables/$id/entries", $this->entry($periods[0]['id'], 0));
+        $this->postJson("/api/v1/timetables/$id/activate");
+        $engine = app(BellEngine::class);
+        $engine->runForSchool($this->school, Carbon::parse('2026-10-10 04:30:30', 'UTC'));     // 08:00 start: session scheduled
+
+        \Tests\Support\FakeMediaProvider::$failEndRoom = true;
+        try {
+            // 08:45 end while the SFU is failing: the event stays pending (retried), the engine does not blow up.
+            $engine->runForSchool($this->school, Carbon::parse('2026-10-10 05:16:00', 'UTC'));
+            $this->assertSame('scheduled', $this->inSchool($this->school, fn () => \App\Models\LessonSession::first()->status));
+            $this->assertSame(1, ScheduleEvent::withoutGlobalScopes()->whereNull('processed_at')->where('event', 'end')->where('fires_at', '<=', '2026-10-10 05:16:00')->count());
+        } finally {
+            \Tests\Support\FakeMediaProvider::$failEndRoom = false;
+        }
+
+        $engine->runForSchool($this->school, Carbon::parse('2026-10-10 05:17:00', 'UTC'));    // SFU back: closed as not held
+        $this->assertSame('not_held', $this->inSchool($this->school, fn () => \App\Models\LessonSession::first()->status));
+        $this->assertSame(1, OutboxNotification::withoutGlobalScopes()->where('type', 'session.not_held')->count());
+    }
+
     public function test_restart_catches_up_recent_events_but_skips_stale_ones(): void
     {
         [$id, $periods] = $this->createTimetable();

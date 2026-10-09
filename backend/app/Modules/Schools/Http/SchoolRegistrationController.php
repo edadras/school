@@ -3,6 +3,7 @@
 namespace App\Modules\Schools\Http;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlatformSetting;
 use App\Models\SchoolApprovalRequest;
 use App\Modules\Schools\SchoolApprovalService;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,11 @@ class SchoolRegistrationController extends Controller
     /** Public, throttled. Creates a PENDING school; nothing is usable until the platform admin approves. */
     public function register(Request $request): JsonResponse
     {
+        $open = PlatformSetting::where('key', 'registration_open')->first()?->value;
+        if ($open !== null && ! filter_var(is_array($open) ? ($open[0] ?? true) : $open, FILTER_VALIDATE_BOOLEAN)) {
+            abort(403, 'ثبت‌نام مدرسهٔ جدید در حال حاضر بسته است.');
+        }
+
         $data = $request->validate([
             'school.name' => ['required', 'string', 'max:255'],
             'school.code' => ['required', 'alpha_dash:ascii', 'min:3', 'max:40', 'unique:schools,code'],
