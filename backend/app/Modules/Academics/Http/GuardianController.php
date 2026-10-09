@@ -55,6 +55,18 @@ class GuardianController extends Controller
         return response()->json(['data' => $link]);
     }
 
+    /** Teachers who teach the guardian's (approved) children — the only people a parent may request a meeting with. */
+    public function childTeachers(Request $request): JsonResponse
+    {
+        $access = app(\App\Modules\Tenancy\Access::class);
+        $sections = \App\Models\Enrollment::whereIn('student_id', $access->studentIds($request->user()))->where('status', 'active')->pluck('section_id');
+        $rows = \App\Models\TeacherAssignment::whereIn('section_id', $sections)->get();
+        $teachers = \App\Models\Teacher::with('user:id,name')->whereIn('id', $rows->pluck('teacher_id'))->get();
+        $subjects = \App\Models\Subject::whereIn('id', $rows->pluck('subject_id'))->pluck('name', 'id');
+
+        return response()->json(['data' => $teachers->map(fn ($t) => ['id' => $t->id, 'label' => $t->user->name.' ('.$rows->where('teacher_id', $t->id)->map(fn ($r) => $subjects[$r->subject_id] ?? '')->unique()->implode('، ').')'])->values()]);
+    }
+
     /** Children visible to the logged-in guardian: approved links only. */
     public function myChildren(Request $request): JsonResponse
     {
@@ -64,7 +76,9 @@ class GuardianController extends Controller
                 ->whereIn('guardian_id', Guardian::where('user_id', $request->user()->id)->select('id'))
                 ->select('student_id'))
             ->get(['id', 'first_name', 'last_name', 'student_code', 'status']);
+        $sections = \App\Models\Enrollment::whereIn('student_id', $children->pluck('id'))->where('status', 'active')->get()->keyBy('student_id');
+        $names = \App\Models\Section::with('grade:id,name')->whereIn('id', $sections->pluck('section_id'))->get()->mapWithKeys(fn ($x) => [$x->id => trim(($x->grade->name ?? '').' '.$x->name)]);
 
-        return response()->json(['data' => $children]);
+        return response()->json(['data' => $children->map(fn ($c) => $c->toArray() + ['section_id' => $sections[$c->id]->section_id ?? null, 'section' => $names[$sections[$c->id]->section_id ?? 0] ?? null])->values()]);
     }
 }

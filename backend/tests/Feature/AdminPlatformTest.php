@@ -285,4 +285,43 @@ class AdminPlatformTest extends TestCase
         $this->assertTrue(ChannelAuth::conversation($this->u1, $sid, $conv->id));
         $this->assertFalse(ChannelAuth::conversation($this->u2, $sid, $conv->id));
     }
+
+    public function test_teacher_sees_only_own_classes_students_and_assignments(): void
+    {
+        // The teacher teaches section A (s1, s2). Section B (outsider) belongs to someone else.
+        $students = $this->as_($this->teacher)->getJson('/api/v1/academics/students')->assertOk()->json('data');
+        $this->assertEqualsCanonicalizing([$this->s1->id, $this->s2->id], array_column($students, 'id'));
+        $this->getJson("/api/v1/academics/students/{$this->outsider->id}")->assertNotFound();
+        $this->assertSame([$this->fx['section']->id], array_column($this->getJson('/api/v1/academics/sections')->json('data'), 'id'));
+        $this->getJson("/api/v1/academics/sections/{$this->section2->id}")->assertNotFound();
+        $this->assertEqualsCanonicalizing([$this->fx['math']->id, $this->fx['sci']->id], array_column($this->getJson('/api/v1/academics/subjects')->json('data'), 'id'));
+        $this->getJson('/api/v1/enrollments')->assertJsonCount(2, 'data');
+
+        // another teacher with no assignments sees nothing of this class
+        $other = $this->makeMember($this->school, 'teacher');
+        $this->inSchool($this->school, fn () => \App\Models\Teacher::create(['user_id' => $other->id]));
+        $this->as_($other)->getJson('/api/v1/academics/students')->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/teacher-assignments')->assertJsonCount(0, 'data');
+        // staff still see everything
+        $this->as_($this->deputy)->getJson('/api/v1/academics/students')->assertJsonCount(3, 'data');
+    }
+
+    public function test_guardian_meeting_requests_only_for_own_children_and_are_answered_by_the_school(): void
+    {
+        $teacherModel = $this->fx['teacher'];
+        $this->as_($this->guardian)->postJson('/api/v1/meetings', ['student_id' => $this->s2->id, 'topic' => 'پیگیری'])->assertForbidden();        // not my child
+        $this->postJson('/api/v1/meetings', ['student_id' => $this->s1->id, 'teacher_id' => $teacherModel->id, 'topic' => 'افت نمره ریاضی'])->assertCreated();
+        $this->as_($this->u1)->postJson('/api/v1/meetings', ['student_id' => $this->s1->id, 'topic' => 'x'])->assertForbidden();                  // students can't (and no guardian.access)
+        $this->assertTrue(OutboxNotification::withoutGlobalScopes()->where('type', 'meeting.requested')->where('user_id', $this->teacher->id)->exists());
+
+        $id = $this->as_($this->teacher)->getJson('/api/v1/meetings')->assertJsonCount(1, 'data')->json('data.0.id');
+        $other = $this->makeMember($this->school, 'teacher');
+        $this->inSchool($this->school, fn () => \App\Models\Teacher::create(['user_id' => $other->id]));
+        $this->as_($other)->getJson('/api/v1/meetings')->assertJsonCount(0, 'data');
+        $this->putJson("/api/v1/meetings/$id/respond", ['status' => 'accepted', 'scheduled_at' => now()->addDays(2)->toIso8601String()])->assertForbidden();
+        $this->as_($this->teacher)->putJson("/api/v1/meetings/$id/respond", ['status' => 'accepted'])->assertStatus(422);                           // needs a date
+        $this->putJson("/api/v1/meetings/$id/respond", ['status' => 'accepted', 'scheduled_at' => now()->addDays(2)->toIso8601String(), 'response_note' => 'سه‌شنبه'])->assertOk();
+        $this->as_($this->guardian)->getJson('/api/v1/meetings')->assertJsonPath('data.0.status', 'accepted');
+        $this->assertTrue(OutboxNotification::withoutGlobalScopes()->where('type', 'meeting.responded')->where('user_id', $this->guardian->id)->exists());
+    }
 }

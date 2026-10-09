@@ -8,16 +8,41 @@ use App\Modules\Audit\Audit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Modules\Tenancy\Access;
 
 class ResourceController extends Controller
 {
+    /** Teachers only see rows tied to their own classes; students/guardians have no access to these endpoints at all. */
+    private function scoped(Request $request, string $resource, $q)
+    {
+        $access = app(Access::class);
+        $user = $request->user();
+        if ($access->isStaff($user)) {
+            return $q;
+        }
+        $sections = $access->sectionIds($user) ?? [];
+        $teacherId = $access->teacherId($user) ?? 0;
+
+        return match ($resource) {
+            'sections' => $q->whereIn('id', $sections),
+            'students' => $q->whereIn('id', \App\Models\Enrollment::whereIn('section_id', $sections)->where('status', 'active')->select('student_id')),
+            'grades' => $q->whereIn('id', \App\Models\Section::whereIn('id', $sections)->select('grade_id')),
+            'subjects' => $q->whereIn('id', \App\Models\TeacherAssignment::where('teacher_id', $teacherId)->select('subject_id')),
+            default => $q,   // academic years, calendar events: school-wide by nature
+        };
+    }
+
     public function index(Request $request, string $resource): JsonResponse
     {
-        $q = ResourceRegistry::model($resource)::query()->orderByDesc('id');
+        $q = $this->scoped($request, $resource, ResourceRegistry::model($resource)::query())->orderByDesc('id');
+        $resource === 'sections' && $q->with('grade:id,name');
+        // Students of one class (active enrolment) — used by roll call, grade entry and exam grading.
+        $resource === 'students' && $request->filled('section_id')
+            && $q->whereIn('id', \App\Models\Enrollment::where('section_id', $request->integer('section_id'))->where('status', 'active')->select('student_id'));
 
         if ($request->filled('q')) {
             $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $request->string('q')).'%';
-            $cols = ['academic-years' => ['title'], 'grades' => ['name'], 'subjects' => ['name', 'code'],
+            $cols = ['academic-years' => ['title'], 'terms' => ['title'], 'grades' => ['name'], 'subjects' => ['name', 'code'],
                 'sections' => ['name'], 'students' => ['first_name', 'last_name', 'student_code'], 'calendar-events' => ['title']][$resource];
             $q->where(fn ($w) => collect($cols)->each(fn ($c) => $w->orWhere($c, 'like', $term)));
         }
@@ -29,9 +54,9 @@ class ResourceController extends Controller
         return response()->json($q->paginate(min((int) $request->integer('per_page', 25), 100)));
     }
 
-    public function show(string $resource, int $id): JsonResponse
+    public function show(Request $request, string $resource, int $id): JsonResponse
     {
-        return response()->json(['data' => ResourceRegistry::model($resource)::findOrFail($id)]);
+        return response()->json(['data' => $this->scoped($request, $resource, ResourceRegistry::model($resource)::query())->findOrFail($id)]);
     }
 
     public function store(Request $request, string $resource): JsonResponse

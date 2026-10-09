@@ -1,0 +1,8 @@
+{
+  "name": "school-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Browser end-to-end tests (Flutter web + Laravel + real LiveKit SFU)",
+  "scripts": { "test": "playwright test" },
+  "devDependencies": { "@playwright/test": "1.56.1" }
+}

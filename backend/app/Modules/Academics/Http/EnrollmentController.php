@@ -17,10 +17,17 @@ class EnrollmentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $q = Enrollment::query()->orderByDesc('id');
+        $access = app(\App\Modules\Tenancy\Access::class);
+        $access->isStaff($request->user()) || $q->whereIn('section_id', $access->sectionIds($request->user()) ?? []);
         $request->filled('section_id') && $q->where('section_id', $request->integer('section_id'));
         $request->filled('student_id') && $q->where('student_id', $request->integer('student_id'));
 
-        return response()->json($q->paginate(min((int) $request->integer('per_page', 50), 200)));
+        $page = $q->paginate(min((int) $request->integer('per_page', 50), 200));
+        $students = \App\Models\Student::whereIn('id', collect($page->items())->pluck('student_id'))->get()->mapWithKeys(fn ($s) => [$s->id => $s->first_name.' '.$s->last_name]);
+        $sections = Section::with('grade:id,name')->whereIn('id', collect($page->items())->pluck('section_id'))->get()->mapWithKeys(fn ($s) => [$s->id => trim(($s->grade->name ?? '').' '.$s->name)]);
+        $page->getCollection()->transform(fn ($e) => $e->setAttribute('student_name', $students[$e->student_id] ?? '')->setAttribute('section_label', $sections[$e->section_id] ?? ''));
+
+        return response()->json($page);
     }
 
     /** Enroll, or transfer if the student already has an enrollment in that academic year. */

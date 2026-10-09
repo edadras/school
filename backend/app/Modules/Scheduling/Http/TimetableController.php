@@ -24,7 +24,9 @@ class TimetableController extends Controller
 
     public function show(int $id): JsonResponse
     {
-        return response()->json(['data' => Timetable::with(['periods', 'entries'])->findOrFail($id)]);
+        $tt = Timetable::with(['periods', 'entries'])->findOrFail($id);
+
+        return response()->json(['data' => $tt, 'lookup' => $this->lookup($tt->entries)]);
     }
 
     public function store(Request $request): JsonResponse
@@ -88,12 +90,37 @@ class TimetableController extends Controller
         return response()->json(['data' => $sub], 201);
     }
 
+    /** subject/section/teacher id → display name for the entries given. */
+    private function lookup($entries): array
+    {
+        return [
+            'subjects' => \App\Models\Subject::whereIn('id', collect($entries)->pluck('subject_id')->unique())->pluck('name', 'id'),
+            'sections' => \App\Models\Section::with('grade')->whereIn('id', collect($entries)->pluck('section_id')->unique())->get()->mapWithKeys(fn ($s) => [$s->id => trim(($s->grade->name ?? '').' '.$s->name)]),
+            'teachers' => \App\Models\Teacher::with('user:id,name')->whereIn('id', collect($entries)->pluck('teacher_id')->unique())->get()->mapWithKeys(fn ($t) => [$t->id => $t->user->name]),
+        ];
+    }
+
+    private function schedulePayload(?Timetable $tt, $entries): array
+    {
+        if (! $tt) {
+            return ['timetable' => null, 'periods' => [], 'entries' => [], 'lookup' => ['subjects' => [], 'sections' => [], 'teachers' => []], 'server_time' => now()->toIso8601String()];
+        }
+
+        return [
+            'timetable' => $tt->only(['id', 'title', 'version', 'working_days']),
+            'periods' => $tt->periods,
+            'entries' => $entries,
+            'lookup' => $this->lookup($entries),
+            'server_time' => now()->toIso8601String(), // clients align their clock to the server
+        ];
+    }
+
     /** Own weekly schedule for teacher or student (permission: schedule.own). */
     public function mine(Request $request): JsonResponse
     {
         $tt = Timetable::where('status', 'active')->first();
         if (! $tt) {
-            return response()->json(['timetable' => null, 'entries' => []]);
+            return response()->json($this->schedulePayload(null, []));
         }
         $uid = $request->user()->id;
         $q = TimetableEntry::where('timetable_id', $tt->id);
@@ -106,12 +133,18 @@ class TimetableController extends Controller
             $q->whereRaw('1 = 0');
         }
 
-        return response()->json([
-            'timetable' => $tt->only(['id', 'title', 'version', 'working_days']),
-            'periods' => $tt->periods,
-            'entries' => $q->get(),
-            'server_time' => now()->toIso8601String(), // clients align their clock to the server
-        ]);
+        return response()->json($this->schedulePayload($tt, $q->get()));
+    }
+
+    /** A guardian/teacher/staff member viewing a specific student's weekly schedule. */
+    public function ofStudent(Request $request, int $studentId, \App\Modules\Tenancy\Access $access): JsonResponse
+    {
+        abort_unless($access->canViewStudent($request->user(), $studentId), 404);
+        $tt = Timetable::where('status', 'active')->first();
+        $section = $access->sectionOfStudent($studentId);
+        $entries = $tt && $section ? TimetableEntry::where('timetable_id', $tt->id)->where('section_id', $section)->get() : [];
+
+        return response()->json($this->schedulePayload($tt, $entries));
     }
 
     private function entryData(Request $request): array

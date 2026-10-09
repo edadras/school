@@ -34,6 +34,41 @@ class MessagingController extends Controller
         ])]);
     }
 
+    /** Display names of a conversation's members (only for participants). */
+    public function participants(Request $request, int $id): JsonResponse
+    {
+        $c = Conversation::findOrFail($id);
+        $this->svc->assertParticipant($request->user(), $c);
+        $rows = ConversationParticipant::where('conversation_id', $c->id)->get();
+        $users = \App\Models\User::whereIn('id', $rows->pluck('user_id'))->pluck('name', 'id');
+        $roles = \App\Models\SchoolUserMembership::where('school_id', app(\App\Modules\Tenancy\CurrentSchool::class)->id())->whereIn('user_id', $rows->pluck('user_id'))
+            ->with('role:id,key')->get()->groupBy('user_id')->map(fn ($g) => $g->first()->role->key);
+
+        return response()->json(['data' => $rows->map(fn ($p) => ['user_id' => $p->user_id, 'name' => $users[$p->user_id] ?? '—', 'role' => $roles[$p->user_id] ?? null])->values(), 'conversation' => $c->only(['id', 'type', 'title', 'is_locked', 'section_id'])]);
+    }
+
+    /** People the caller may try to message (final permission is still enforced by school policy on creation). */
+    public function contacts(Request $request): JsonResponse
+    {
+        $u = $request->user();
+        $schoolId = app(\App\Modules\Tenancy\CurrentSchool::class)->id();
+        $secs = $this->access->sectionIds($u);
+        $base = \App\Models\SchoolUserMembership::where('school_id', $schoolId)->where('status', 'active')->where('user_id', '!=', $u->id);
+        if ($secs === null) {                                      // staff: everyone in the school
+            $ids = $base->pluck('user_id');
+        } else {
+            $teachers = \Illuminate\Support\Facades\DB::table('teacher_assignments as ta')->join('teachers as t', 't.id', '=', 'ta.teacher_id')->whereIn('ta.section_id', $secs)->pluck('t.user_id');
+            $guardians = \Illuminate\Support\Facades\DB::table('enrollments as e')->join('student_guardians as sg', 'sg.student_id', '=', 'e.student_id')->join('guardians as g', 'g.id', '=', 'sg.guardian_id')
+                ->whereIn('e.section_id', $secs)->where('e.status', 'active')->where('sg.status', 'approved')->pluck('g.user_id');
+            $staff = \Illuminate\Support\Facades\DB::table('school_user_memberships as m')->join('roles as r', 'r.id', '=', 'm.role_id')->where('m.school_id', $schoolId)->whereIn('r.key', ['school_admin', 'deputy'])->pluck('m.user_id');
+            $ids = $this->access->teacherId($u) ? $teachers->merge($guardians)->merge($staff) : $teachers->merge($staff);   // guardians/students: teachers + managers
+        }
+        $ids = $ids->unique()->reject(fn ($x) => $x === $u->id)->values();
+        $roles = \App\Models\SchoolUserMembership::where('school_id', $schoolId)->whereIn('user_id', $ids)->with('role:id,key')->get()->groupBy('user_id')->map(fn ($g) => $g->first()->role->key);
+
+        return response()->json(['data' => \App\Models\User::whereIn('id', $ids)->orderBy('name')->get(['id', 'name'])->map(fn ($x) => ['user_id' => $x->id, 'name' => $x->name, 'role' => $roles[$x->id] ?? null])->values()]);
+    }
+
     public function direct(Request $request): JsonResponse
     {
         $d = $request->validate(['user_id' => ['required', 'integer'], 'assignment_id' => ['nullable', ResourceRegistry::existsInSchool('assignments')]]);

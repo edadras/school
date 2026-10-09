@@ -25,6 +25,7 @@ use App\Modules\Learning\Http\MaterialController;
 use App\Modules\Messaging\Http\MessagingController;
 use App\Modules\Notifications\Http\PreferenceController;
 use App\Modules\ReportCards\Http\ReportCardController;
+use App\Modules\Support\Http\MeetingController;
 use App\Modules\Support\Http\SupportController;
 use App\Modules\VirtualClassrooms\Http\SessionController;
 use App\Modules\VirtualClassrooms\Http\WebhookController;
@@ -82,7 +83,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('me/schedule', [TimetableController::class, 'mine'])->middleware('perm:schedule.own');
         Route::get('me/notifications', [NotificationController::class, 'index']);
         Route::post('me/notifications/{id}/read', [NotificationController::class, 'read']);
+        Route::get('me/teaching', [AssignmentController::class, 'mine']);
         Route::get('me/children', [GuardianController::class, 'myChildren']);
+        Route::get('me/child-teachers', [GuardianController::class, 'childTeachers'])->middleware('perm:guardian.access');
+        Route::get('students/{studentId}/schedule', [TimetableController::class, 'ofStudent'])->whereNumber('studentId');
 
         Route::middleware('perm:academics.view')->group(function () {
             Route::get('academics/{resource}', [ResourceController::class, 'index'])->whereIn('resource', \App\Modules\Academics\ResourceRegistry::keys());
@@ -142,6 +146,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('announcements', [SchoolAdminController::class, 'publishAnnouncement'])->middleware('perm:announcements.manage');
         Route::get('students/{studentId}/notes', [SchoolAdminController::class, 'notes'])->whereNumber('studentId');
         Route::post('students/{studentId}/notes', [SchoolAdminController::class, 'addNote'])->whereNumber('studentId');
+
+        // --- meeting requests (guardian ↔ school)
+        Route::get('meetings', [MeetingController::class, 'index']);
+        Route::post('meetings', [MeetingController::class, 'store'])->middleware('perm:guardian.access');
+        Route::put('meetings/{id}/respond', [MeetingController::class, 'respond'])->whereNumber('id');
 
         // --- support
         Route::get('support/tickets', [SupportController::class, 'mine']);
@@ -212,7 +221,9 @@ Route::middleware('auth:sanctum')->group(function () {
         // --- messaging
         Route::middleware('perm:messaging.use')->group(function () {
             Route::get('conversations', [MessagingController::class, 'index']);
+            Route::get('contacts', [MessagingController::class, 'contacts']);
             Route::post('conversations/direct', [MessagingController::class, 'direct']);
+            Route::get('conversations/{id}/participants', [MessagingController::class, 'participants'])->whereNumber('id');
             Route::get('conversations/{id}/messages', [MessagingController::class, 'messages'])->whereNumber('id');
             Route::post('conversations/{id}/messages', [MessagingController::class, 'send'])->whereNumber('id')->middleware('throttle:40,1');
             Route::post('messages/{id}/report', [MessagingController::class, 'report'])->whereNumber('id');

@@ -18,14 +18,14 @@ class ResourceRegistry
 {
     public static function keys(): array
     {
-        return ['academic-years', 'grades', 'subjects', 'sections', 'students', 'calendar-events'];
+        return ['academic-years', 'grades', 'subjects', 'terms', 'sections', 'students', 'calendar-events'];
     }
 
     public static function model(string $key): string
     {
         return [
             'academic-years' => AcademicYear::class, 'grades' => Grade::class, 'subjects' => Subject::class,
-            'sections' => Section::class, 'students' => Student::class, 'calendar-events' => \App\Models\SchoolCalendarEvent::class,
+            'sections' => Section::class, 'students' => Student::class, 'calendar-events' => \App\Models\SchoolCalendarEvent::class, 'terms' => \App\Models\Term::class,
         ][$key] ?? abort(404);
     }
 
@@ -62,6 +62,10 @@ class ResourceRegistry
                 'name' => [$req, 'string', 'max:60'], 'track' => ['nullable', 'string', 'max:60'],
                 'capacity' => ['sometimes', 'integer', 'between:1,500'],
             ],
+            'terms' => [
+                'academic_year_id' => [$req, self::existsInSchool('academic_years')], 'title' => [$req, 'string', 'max:60'],
+                'starts_on' => [$req, 'date'], 'ends_on' => [$req, 'date', 'after:starts_on'],
+            ],
             'calendar-events' => [
                 'type' => [$req, Rule::in(['holiday', 'exceptional', 'meeting', 'event'])],
                 'title' => [$req, 'string', 'max:120'], 'starts_on' => [$req, 'date'],
@@ -85,6 +89,7 @@ class ResourceRegistry
 
         return match ($key) {
             'academic-years' => 'سال تحصیلی حذف نمی‌شود؛ بایگانی کنید.',
+            'terms' => ($has('grade_records', 'term_id') || $has('report_cards', 'term_id')) ? 'این ترم نمره یا کارنامه دارد و حذف نمی‌شود.' : null,
             'students' => 'دانش‌آموز حذف نمی‌شود؛ وضعیت را «بایگانی» کنید.',
             'grades' => ($has('sections', 'grade_id') || $has('subjects', 'grade_id')) ? 'این پایه کلاس یا درس وابسته دارد.' : null,
             'subjects' => ($has('teacher_assignments', 'subject_id') || $has('timetable_entries', 'subject_id')) ? 'این درس در تخصیص یا برنامه استفاده شده است.' : null,

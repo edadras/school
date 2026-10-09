@@ -19,7 +19,9 @@ class TeacherController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $q = Teacher::query()->with('user:id,name,email,phone')->orderByDesc('id');
+        // Contact details only for staff; colleagues see names.
+        $staff = app(\App\Modules\Tenancy\Access::class)->isStaff($request->user());
+        $q = Teacher::query()->with($staff ? 'user:id,name,email,phone' : 'user:id,name')->orderByDesc('id');
         $request->filled('q') && $q->whereHas('user', fn ($u) => $u->where('name', 'like', '%'.$request->string('q').'%'));
 
         return response()->json($q->paginate(min((int) $request->integer('per_page', 25), 100)));
