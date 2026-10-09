@@ -324,4 +324,30 @@ class AdminPlatformTest extends TestCase
         $this->as_($this->guardian)->getJson('/api/v1/meetings')->assertJsonPath('data.0.status', 'accepted');
         $this->assertTrue(OutboxNotification::withoutGlobalScopes()->where('type', 'meeting.responded')->where('user_id', $this->guardian->id)->exists());
     }
+
+    public function test_staff_can_give_a_student_a_login_and_it_only_works_inside_the_school(): void
+    {
+        $stu = $this->inSchool($this->school, fn () => Student::create(['first_name' => 'تازه', 'last_name' => 'وارد', 'student_code' => '9001']));
+        $this->as_($this->teacher)->postJson("/api/v1/students/{$stu->id}/account", ['email' => 'new@example.test', 'password' => 'Str0ng-Password1'])->assertForbidden();
+        $this->as_($this->deputy)->postJson("/api/v1/students/{$stu->id}/account", ['email' => 'new@example.test', 'password' => 'weak'])->assertStatus(422);
+        $this->postJson("/api/v1/students/{$stu->id}/account", ['email' => 'new@example.test', 'password' => 'Str0ng-Password1'])->assertCreated();
+        $this->postJson("/api/v1/students/{$stu->id}/account", ['email' => 'again@example.test', 'password' => 'Str0ng-Password1'])->assertStatus(422);   // one account per student
+        $token = $this->postJson('/api/v1/auth/login', ['login' => 'new@example.test', 'password' => 'Str0ng-Password1'])->assertOk()->json('token');
+        $this->withToken($token)->withHeaders(['X-School-Id' => (string) $this->school->id])->getJson('/api/v1/me/schedule')->assertOk();
+    }
+
+    public function test_only_school_admin_manages_deputies_and_disabled_staff_lose_access(): void
+    {
+        $this->as_($this->deputy)->postJson('/api/v1/staff', ['name' => 'x', 'email' => 'x@example.test', 'role' => 'deputy', 'password' => 'Str0ng-Password1'])->assertForbidden();
+        $this->as_($this->admin)->postJson('/api/v1/staff', ['name' => 'معاون جدید', 'email' => 'dep2@example.test', 'role' => 'deputy', 'password' => 'Str0ng-Password1'])->assertCreated();
+        $this->postJson('/api/v1/staff', ['name' => 'معاون جدید', 'email' => 'dep2@example.test', 'role' => 'deputy', 'password' => 'Str0ng-Password1'])->assertStatus(422);
+        $list = $this->getJson('/api/v1/staff')->assertOk()->json('data');
+        $mid = collect($list)->firstWhere('email', 'dep2@example.test')['membership_id'];
+        $dep2 = \App\Models\User::where('email', 'dep2@example.test')->first();
+        $this->as_($dep2)->getJson('/api/v1/academics/grades')->assertOk();
+        $this->as_($this->admin)->patchJson("/api/v1/staff/$mid", ['status' => 'disabled'])->assertOk();
+        $this->as_($dep2)->getJson('/api/v1/academics/grades')->assertForbidden();
+        $own = collect($list)->firstWhere('email', $this->admin->email)['membership_id'];
+        $this->as_($this->admin)->patchJson("/api/v1/staff/$own", ['status' => 'disabled'])->assertStatus(422);       // cannot lock yourself out
+    }
 }

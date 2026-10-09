@@ -169,7 +169,7 @@ class _AssignmentDetailState extends ConsumerState<AssignmentDetail> {
         AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [Expanded(child: Text('${a['title']}', style: Theme.of(context).textTheme.titleLarge)), StatusChip(statusName(status), tone: _tone(status))]),
           const SizedBox(height: 8),
-          if ((a['description'] ?? '').toString().isNotEmpty) SelectableText('${a['description']}'),
+          if ((a['description'] ?? '').toString().isNotEmpty) Text('${a['description']}'),
           const SizedBox(height: 8),
           Wrap(spacing: 16, children: [
             Text('بارم: ${fmtNum(a['max_score'])}', style: Theme.of(context).textTheme.bodySmall),

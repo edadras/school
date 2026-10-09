@@ -19,45 +19,60 @@ export async function enableSemantics(page: Page) {
   await page.waitForSelector('flt-semantics', { state: 'attached', timeout: 30_000 });
 }
 
+const TOKENS = new Map<string, { token: string; schoolId?: number; user: any }>();
+
 /** Typed API helper for fast, deterministic setup (the UI tests then exercise the behaviour under test). */
 export class Api {
   token?: string;
   schoolId?: number;
   constructor(private ctx: Awaited<ReturnType<typeof request.newContext>>) {}
   static async create() {
-    return new Api(await request.newContext({ baseURL: BASE + '/api/v1', extraHTTPHeaders: { Accept: 'application/json' } }));
+    return new Api(await request.newContext({ baseURL: BASE + '/api/v1/', extraHTTPHeaders: { Accept: 'application/json' } }));
   }
+  /** Playwright resolves a leading '/' against the origin; keep paths relative to /api/v1/. */
+  private p(path: string) { return path.replace(/^\//, ''); }
   private h() {
     return { ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...(this.schoolId ? { 'X-School-Id': String(this.schoolId) } : {}) };
   }
   async login(login: string, password: string, schoolId?: number) {
-    const r = await this.ctx.post('/auth/login', { data: { login, password } });
+    // Login is rate-limited (5/min per account, by design): reuse the session of an already signed-in account.
+    const cached = TOKENS.get(login);
+    if (cached) { this.token = cached.token; this.schoolId = schoolId ?? cached.schoolId; return cached.user; }
+    let r = await this.ctx.post('auth/login', { data: { login, password } });
+    for (let i = 0; r.status() === 429 && i < 6; i++) { await new Promise((x) => setTimeout(x, 15_000)); r = await this.ctx.post('auth/login', { data: { login, password } }); }
     expect(r.status(), await r.text()).toBe(200);
     const j = await r.json();
     this.token = j.token;
     this.schoolId = schoolId ?? j.user.memberships?.[0]?.school?.id;
+    TOKENS.set(login, { token: j.token, schoolId: this.schoolId, user: j });
     return j;
   }
   async post(path: string, data?: any, expected = [200, 201, 204]) {
-    const r = await this.ctx.post(path, { data, headers: this.h() });
+    const r = await this.ctx.post(this.p(path), { data, headers: this.h() });
     expect(expected, `${path}: ${await r.text()}`).toContain(r.status());
     return r.status() === 204 ? null : r.json();
   }
   async get(path: string) {
-    const r = await this.ctx.get(path, { headers: this.h() });
+    const r = await this.ctx.get(this.p(path), { headers: this.h() });
     expect(r.status(), `${path}: ${await r.text()}`).toBe(200);
     return r.json();
   }
   async put(path: string, data?: any) {
-    const r = await this.ctx.put(path, { data, headers: this.h() });
+    const r = await this.ctx.put(this.p(path), { data, headers: this.h() });
     expect([200, 201, 204], `${path}: ${await r.text()}`).toContain(r.status());
     return r.status() === 204 ? null : r.json();
   }
   async patch(path: string, data?: any) {
-    const r = await this.ctx.patch(path, { data, headers: this.h() });
+    const r = await this.ctx.patch(this.p(path), { data, headers: this.h() });
     expect([200, 201], `${path}: ${await r.text()}`).toContain(r.status());
     return r.json();
   }
+}
+
+/** Text anywhere on screen: either a plain node or part of a merged semantics label (Flutter merges sibling texts into one aria-label). */
+export function see(page: Page, text: string): Locator {
+  const esc = text.replace(/"/g, '\\"');
+  return page.getByText(text).or(page.locator(`[aria-label*="${esc}"]`)).first();
 }
 
 /** Semantics nodes of a canvas-rendered app can report as "outside the viewport"; a DOM click triggers Flutter's tap action. */
@@ -75,11 +90,12 @@ export async function typeInto(page: Page, l: Locator, text: string) {
   await page.keyboard.type(text, { delay: 5 });
 }
 
-export async function uiLogin(page: Page, email: string, password: string) {
+export async function uiLogin(page: Page, email: string, password: string, opts: { expectFail?: boolean } = {}) {
   await openApp(page, '/login');
   await typeInto(page, page.getByRole('textbox', { name: 'ایمیل یا شمارهٔ موبایل' }), email);
   await typeInto(page, page.getByRole('textbox', { name: 'رمز عبور' }), password);
   await tap(page.getByRole('button', { name: 'ورود', exact: true }));
+  if (!opts.expectFail) await page.waitForURL((u) => !/^\/(login|register-school)/.test(u.pathname), { timeout: 30_000 });
 }
 
 export async function newUserContext(browser: Browser): Promise<[BrowserContext, Page]> {

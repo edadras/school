@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
 import 'package:file_picker/file_picker.dart';
@@ -202,7 +203,7 @@ class _ChatViewState extends ConsumerState<ChatView> {
                           if (reply != null) Container(margin: const EdgeInsets.only(bottom: 4), padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: Colors.black.withValues(alpha: .04), borderRadius: BorderRadius.circular(8)), child: Text('${reply.m['body'] ?? 'پیوست'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall)),
                           if (x.m['deleted'] == true) const Text('این پیام حذف شد.', style: TextStyle(color: Palette.muted, fontStyle: FontStyle.italic))
                           else ...[
-                            if ((x.m['body'] ?? '').toString().isNotEmpty) SelectableText('${x.m['body']}'),
+                            if ((x.m['body'] ?? '').toString().isNotEmpty) Text('${x.m['body']}'),
                             for (final f in (x.m['attachments'] as List? ?? [])) Padding(padding: const EdgeInsets.only(top: 6), child: FileChip(f as int)),
                           ],
                           Row(mainAxisSize: MainAxisSize.min, children: [
@@ -225,9 +226,9 @@ class _ChatViewState extends ConsumerState<ChatView> {
           child: Row(children: [
             IconButton(onPressed: _attach, icon: const Icon(Icons.attach_file), tooltip: 'پیوست فایل'),
             IconButton(onPressed: _toggleRecord, icon: Icon(_recording ? Icons.stop_circle : Icons.mic_none, color: _recording ? Palette.danger : null), tooltip: _recording ? 'پایان ضبط' : 'پیام صوتی'),
-            Expanded(child: TextField(key: const Key('chat-input'), controller: _text, minLines: 1, maxLines: 4, onSubmitted: (_) => _send(), decoration: const InputDecoration(hintText: 'پیام...', isDense: true))),
+            Expanded(child: CallbackShortcuts(bindings: {const SingleActivator(LogicalKeyboardKey.enter): () => _send()}, child: TextField(key: const Key('chat-input'), controller: _text, minLines: 1, maxLines: 4, decoration: const InputDecoration(hintText: 'پیام...', isDense: true)))),
             const SizedBox(width: 6),
-            IconButton.filled(key: const Key('chat-send'), onPressed: () => _send(), icon: const Icon(Icons.send)),
+            IconButton.filled(key: const Key('chat-send'), tooltip: 'ارسال', onPressed: () => _send(), icon: const Icon(Icons.send)),
           ]),
         ),
     ]);

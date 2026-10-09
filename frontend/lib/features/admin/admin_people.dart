@@ -19,7 +19,7 @@ class AdminPeople extends ConsumerStatefulWidget {
 }
 
 class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProviderStateMixin {
-  late final _tabs = TabController(length: 3, vsync: this);
+  late final _tabs = TabController(length: 4, vsync: this);
   final _teachers = GlobalKey<PagedListState>();
   final _students = GlobalKey<PagedListState>();
   String _q = '';
@@ -32,8 +32,8 @@ class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) => Column(children: [
-        Material(color: Palette.surface, child: TabBar(controller: _tabs, tabs: const [Tab(text: 'دانش‌آموزان'), Tab(text: 'معلمان'), Tab(text: 'ورود و خروج گروهی')])),
-        Expanded(child: TabBarView(controller: _tabs, children: [_studentsTab(), _teachersTab(), _importTab()])),
+        Material(color: Palette.surface, child: TabBar(controller: _tabs, tabs: const [Tab(text: 'دانش‌آموزان'), Tab(text: 'معلمان'), Tab(text: 'کادر اجرایی'), Tab(text: 'ورود و خروج گروهی')])),
+        Expanded(child: TabBarView(controller: _tabs, children: [_studentsTab(), _teachersTab(), _staffTab(), _importTab()])),
       ]);
 
   Widget _studentsTab() => PageBody(children: [
@@ -42,6 +42,7 @@ class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProv
         PagedList(key: _students, path: '/academics/students', query: {'q': _q}, emptyText: 'دانش‌آموزی ثبت نشده است.', itemBuilder: (c, s, st) => AppCard(child: Row(children: [
               const CircleAvatar(backgroundColor: Palette.brandSoft, child: Icon(Icons.person, color: Palette.brand)), const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${s['first_name']} ${s['last_name']}', style: Theme.of(c).textTheme.titleMedium), Text('کد ${faDigits(s['student_code'])}  ·  ${s['status']}', style: Theme.of(c).textTheme.bodySmall)])),
+              if (s['user_id'] == null) IconButton(tooltip: 'ساخت حساب ورود برای دانش‌آموز', icon: const Icon(Icons.key_outlined), onPressed: () => _account(s)),
               IconButton(tooltip: 'ثبت والد/سرپرست', icon: const Icon(Icons.family_restroom_outlined), onPressed: () => _addGuardian(s)),
               IconButton(tooltip: 'ویرایش', icon: const Icon(Icons.edit_outlined), onPressed: () => _editStudent(s)),
             ]))),
@@ -57,6 +58,13 @@ class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProv
     final ok = await showForm(context, title: 'ویرایش دانش‌آموز', initial: s, fields: const [FieldSpec('first_name', 'نام', required: true), FieldSpec('last_name', 'نام خانوادگی', required: true), FieldSpec('student_code', 'کد دانش‌آموزی', required: true), FieldSpec('birth_date', 'تاریخ تولد', type: FieldType.date),
       FieldSpec('status', 'وضعیت', type: FieldType.dropdown, options: [Option('active', 'فعال'), Option('transferred', 'منتقل‌شده'), Option('graduated', 'فارغ‌التحصیل'), Option('archived', 'بایگانی')])],
         submit: (v) async => ref.read(apiProvider).patch('/academics/students/${s['id']}', data: v));
+    if (ok) _students.currentState?.reload();
+  }
+
+  Future<void> _account(Map<String, dynamic> s) async {
+    final ok = await showForm(context, title: 'حساب ورود ${s['first_name']}', submitLabel: 'ساخت حساب', fields: const [
+      FieldSpec('email', 'ایمیل (نام کاربری)', type: FieldType.email), FieldSpec('phone', 'یا شمارهٔ موبایل'), FieldSpec('password', 'رمز اولیه (حداقل ۱۰ نویسه، حرف و عدد)', type: FieldType.password, required: true),
+    ], submit: (v) async => ref.read(apiProvider).post('/academics/students/${s['id']}/account'.replaceFirst('/academics', ''), data: v));
     if (ok) _students.currentState?.reload();
   }
 
@@ -76,6 +84,24 @@ class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProv
         PagedList(key: _teachers, path: '/teachers', emptyText: 'معلمی ثبت نشده است.', itemBuilder: (c, t, st) => AppCard(child: Row(children: [
               const CircleAvatar(backgroundColor: Palette.brandSoft, child: Icon(Icons.school, color: Palette.brand)), const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${t['user']?['name']}', style: Theme.of(c).textTheme.titleMedium), Text('${t['user']?['email'] ?? ''}', textDirection: TextDirection.ltr, style: Theme.of(c).textTheme.bodySmall)])),
+            ]))),
+      ]);
+
+  final _staff = GlobalKey<PagedListState>();
+
+  Widget _staffTab() => PageBody(children: [
+        PageHeader('معاونان و مسئولان آموزشی', actions: [FilledButton.icon(key: const Key('add-staff'), onPressed: () async {
+          final ok = await showForm(context, title: 'عضو جدید کادر اجرایی', fields: const [FieldSpec('name', 'نام و نام خانوادگی', required: true), FieldSpec('email', 'ایمیل (نام کاربری)', type: FieldType.email, required: true), FieldSpec('phone', 'موبایل'),
+            FieldSpec('role', 'نقش', type: FieldType.dropdown, required: true, initial: 'deputy', options: [Option('deputy', 'معاون / مسئول آموزشی'), Option('school_admin', 'مدیر (دسترسی کامل)')]), FieldSpec('password', 'رمز اولیه (حداقل ۱۰ نویسه، حرف و عدد)', type: FieldType.password, required: true)],
+              submit: (v) async => ref.read(apiProvider).post('/staff', data: v));
+          if (ok) _staff.currentState?.reload();
+        }, icon: const Icon(Icons.person_add_alt_1), label: const Text('افزودن'))]),
+        PagedList(key: _staff, path: '/staff', emptyText: 'عضوی ثبت نشده است.', itemBuilder: (c, u, st) => AppCard(child: Row(children: [
+              const CircleAvatar(backgroundColor: Palette.brandSoft, child: Icon(Icons.badge_outlined, color: Palette.brand)), const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${u['name']}', style: Theme.of(c).textTheme.titleMedium), Text('${u['email'] ?? ''}', textDirection: TextDirection.ltr, style: Theme.of(c).textTheme.bodySmall)])),
+              StatusChip(u['role'] == 'school_admin' ? 'مدیر' : 'معاون', tone: Tone.info), const SizedBox(width: 8),
+              StatusChip(u['status'] == 'active' ? 'فعال' : 'غیرفعال', tone: u['status'] == 'active' ? Tone.success : Tone.danger),
+              if (u['id'] != ref.read(sessionProvider).userId) IconButton(tooltip: u['status'] == 'active' ? 'غیرفعال‌سازی' : 'فعال‌سازی', icon: Icon(u['status'] == 'active' ? Icons.block : Icons.check_circle_outline), onPressed: () async { await ref.read(apiProvider).patch('/staff/${u['membership_id']}', data: {'status': u['status'] == 'active' ? 'disabled' : 'active'}); st.reload(); }),
             ]))),
       ]);
 

@@ -55,6 +55,26 @@ class GuardianController extends Controller
         return response()->json(['data' => $link]);
     }
 
+    /** Create the student's own login (students log in with email or phone; no account = no access). */
+    public function createAccount(Request $request, int $studentId): JsonResponse
+    {
+        $student = Student::findOrFail($studentId);
+        abort_if($student->user_id, 422, 'برای این دانش‌آموز قبلاً حساب ساخته شده است.');
+        $d = $request->validate([
+            'email' => ['required_without:phone', 'nullable', 'email', 'unique:users,email'], 'phone' => ['required_without:email', 'nullable', 'string', 'max:20', 'unique:users,phone'],
+            'password' => ['required', Password::min(10)->letters()->numbers()],
+        ]);
+        $schoolId = app(CurrentSchool::class)->id();
+        DB::transaction(function () use ($student, $d, $schoolId) {
+            $user = User::create(['name' => $student->first_name.' '.$student->last_name, 'email' => $d['email'] ?? null, 'phone' => $d['phone'] ?? null, 'password' => $d['password']]);
+            SchoolUserMembership::create(['school_id' => $schoolId, 'user_id' => $user->id, 'role_id' => Role::where('key', 'student')->value('id')]);
+            $student->update(['user_id' => $user->id]);
+        });
+        Audit::record('student.account_created', $student);
+
+        return response()->json(['data' => $student->only(['id', 'user_id'])], 201);
+    }
+
     /** Teachers who teach the guardian's (approved) children — the only people a parent may request a meeting with. */
     public function childTeachers(Request $request): JsonResponse
     {

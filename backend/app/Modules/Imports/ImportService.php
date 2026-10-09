@@ -25,7 +25,7 @@ use OpenSpout\Reader\XLSX\Reader as XlsxReader;
  */
 class ImportService
 {
-    public const STUDENT_COLUMNS = ['student_code', 'first_name', 'last_name', 'birth_date', 'grade', 'section', 'guardian_name', 'guardian_email', 'guardian_phone'];
+    public const STUDENT_COLUMNS = ['student_code', 'first_name', 'last_name', 'birth_date', 'grade', 'section', 'email', 'guardian_name', 'guardian_email', 'guardian_phone'];
 
     public const TEACHER_COLUMNS = ['name', 'email', 'phone', 'personnel_code'];
 
@@ -70,7 +70,7 @@ class ImportService
             $r = $this->norm($r);
             $v = Validator::make($r, [
                 'student_code' => ['required', 'string', 'max:40'], 'first_name' => ['required', 'string', 'max:80'], 'last_name' => ['required', 'string', 'max:80'],
-                'birth_date' => ['nullable', 'date', 'before:today'], 'guardian_email' => ['nullable', 'email'],
+                'birth_date' => ['nullable', 'date', 'before:today'], 'guardian_email' => ['nullable', 'email'], 'email' => ['nullable', 'email', 'unique:users,email'],
             ], [], ['student_code' => 'کد دانش‌آموزی', 'first_name' => 'نام', 'last_name' => 'نام خانوادگی']);
             if ($v->fails()) {
                 $errors[] = ['line' => $line, 'errors' => $v->errors()->all()];
@@ -100,6 +100,11 @@ class ImportService
             try {
                 DB::transaction(function () use ($r, $section, $password, $by) {
                     $stu = Student::create(['student_code' => $r['student_code'], 'first_name' => $r['first_name'], 'last_name' => $r['last_name'], 'birth_date' => $r['birth_date'] ?: null]);
+                    if (! empty($r['email'])) {   // optional: give the student a login right away
+                        $su = User::create(['name' => $r['first_name'].' '.$r['last_name'], 'email' => $r['email'], 'password' => $password]);
+                        SchoolUserMembership::create(['school_id' => $this->current->id(), 'user_id' => $su->id, 'role_id' => Role::where('key', 'student')->value('id')]);
+                        $stu->update(['user_id' => $su->id]);
+                    }
                     if ($section) {
                         Enrollment::create(['student_id' => $stu->id, 'section_id' => $section->id, 'academic_year_id' => $section->academic_year_id, 'enrolled_on' => today()]);
                     }

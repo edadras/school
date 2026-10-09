@@ -100,8 +100,8 @@ class _AssignmentReviewState extends ConsumerState<AssignmentReview> {
         content: SizedBox(width: 560, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [StatusChip(statusName(sub['status'] as String), tone: Tone.info), const SizedBox(width: 8), if (sub['is_late'] == true) const StatusChip('دیرکرد', tone: Tone.danger), const Spacer(), Text('تلاش ${faDigits(sub['attempt'])}')]),
           const SizedBox(height: 10),
-          if ((sub['text_answer'] ?? '').toString().isNotEmpty) Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Palette.bg, borderRadius: BorderRadius.circular(10)), child: SelectableText('${sub['text_answer']}')),
-          if ((sub['math'] as Map?)?['text'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: SelectableText('ریاضی: ${(sub['math'] as Map)['text']}', textDirection: TextDirection.ltr)),
+          if ((sub['text_answer'] ?? '').toString().isNotEmpty) Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Palette.bg, borderRadius: BorderRadius.circular(10)), child: Text('${sub['text_answer']}')),
+          if ((sub['math'] as Map?)?['text'] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text('ریاضی: ${(sub['math'] as Map)['text']}', textDirection: TextDirection.ltr)),
           if ((sub['drawing'] as List?)?.isNotEmpty ?? false) const Padding(padding: EdgeInsets.only(top: 8), child: Text('✎ پاسخ دارای رسم است (در سوابق ذخیره شده).')),
           if ((sub['files'] as List?)?.isNotEmpty ?? false) Padding(padding: const EdgeInsets.only(top: 8), child: Wrap(spacing: 8, runSpacing: 8, children: [for (final f in sub['files'] as List) FileChip(f['file_id'] as int)])),
           const Divider(),

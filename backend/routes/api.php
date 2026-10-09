@@ -4,6 +4,7 @@ use App\Modules\Academics\Http\AssignmentController;
 use App\Modules\Academics\Http\EnrollmentController;
 use App\Modules\Academics\Http\GuardianController;
 use App\Modules\Academics\Http\ResourceController;
+use App\Modules\Academics\Http\StaffController;
 use App\Modules\Academics\Http\TeacherController;
 use App\Modules\Auth\Http\AuthController;
 use App\Modules\Scheduling\Http\NotificationController;
@@ -107,6 +108,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::middleware('perm:people.manage')->group(function () {
             Route::post('teachers', [TeacherController::class, 'store']);
+            Route::post('students/{studentId}/account', [GuardianController::class, 'createAccount'])->whereNumber('studentId');
             Route::post('students/{studentId}/guardians', [GuardianController::class, 'store']);
             Route::delete('students/{studentId}/guardians/{guardianId}', [GuardianController::class, 'revoke']);
         });
@@ -141,6 +143,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('school/profile', [SchoolAdminController::class, 'profile']);
         Route::patch('school/profile', [SchoolAdminController::class, 'updateProfile'])->middleware('perm:school.settings');
         Route::patch('school/settings', [SchoolAdminController::class, 'updateSettings'])->middleware('perm:school.settings');
+        Route::middleware('perm:school.settings')->group(function () {
+            Route::get('staff', [StaffController::class, 'index']);
+            Route::post('staff', [StaffController::class, 'store']);
+            Route::patch('staff/{membershipId}', [StaffController::class, 'update'])->whereNumber('membershipId');
+        });
         Route::get('school/audit', [SchoolAdminController::class, 'audit'])->middleware('perm:audit.view');
         Route::get('announcements', [SchoolAdminController::class, 'announcements']);
         Route::post('announcements', [SchoolAdminController::class, 'publishAnnouncement'])->middleware('perm:announcements.manage');
