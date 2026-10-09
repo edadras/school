@@ -1708,6 +1708,22 @@ paths:
       description: 'Permission (any of): schedule.own'
       parameters:
       - $ref: '#/components/parameters/SchoolId'
+  /me/student-file:
+    get:
+      tags:
+      - me
+      summary: StudentFileController@mine
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
   /me/teaching:
     get:
       tags:
@@ -1955,6 +1971,21 @@ paths:
       tags:
       - platform
       summary: PlatformController@health
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Platform role: super_admin'
+  /platform/metrics:
+    get:
+      tags:
+      - platform
+      summary: PlatformController@metrics
       responses:
         '200':
           description: OK
@@ -2961,6 +2992,23 @@ paths:
         schema:
           type: string
       - $ref: '#/components/parameters/SchoolId'
+  /students/promote:
+    post:
+      tags:
+      - students
+      summary: StudentFileController@promote
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): people.manage'
+      parameters:
+      - $ref: '#/components/parameters/SchoolId'
   /students/{studentId}/account:
     post:
       tags:
@@ -2976,6 +3024,49 @@ paths:
         '422':
           $ref: '#/components/responses/Invalid'
       description: 'Permission (any of): people.manage'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/anonymize:
+    post:
+      tags:
+      - students
+      summary: StudentFileController@anonymize
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
+      description: 'Permission (any of): people.manage'
+      parameters:
+      - name: studentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - $ref: '#/components/parameters/SchoolId'
+  /students/{studentId}/dossier:
+    get:
+      tags:
+      - students
+      summary: StudentFileController@dossier
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Unauthenticated
+        '403':
+          description: Forbidden / school not resolved
+        '422':
+          $ref: '#/components/responses/Invalid'
       parameters:
       - name: studentId
         in: path

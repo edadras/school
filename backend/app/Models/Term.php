@@ -19,4 +19,8 @@ class Term extends Model
         return ['starts_on' => 'date:Y-m-d', 'ends_on' => 'date:Y-m-d'];
     }
 
+    public function year()
+    {
+        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+    }
 }

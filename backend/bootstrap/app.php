@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => null);   // API: an unauthenticated call is a 401, never a redirect to a (non-existent) login route
         $middleware->trustProxies(at: env('TRUSTED_PROXIES') ? explode(',', env('TRUSTED_PROXIES')) : null);
         $middleware->appendToGroup('api', \App\Http\Middleware\SecurityHeaders::class);
+        $middleware->appendToGroup('api', \App\Http\Middleware\RecordMetrics::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API-only: always JSON, never an HTML error page or redirect to a login route.

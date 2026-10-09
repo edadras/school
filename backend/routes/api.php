@@ -63,6 +63,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('platform')->middleware('platform.role:super_admin')->group(function () {
         Route::get('stats', [PlatformController::class, 'stats']);
         Route::get('health', [PlatformController::class, 'health']);
+        Route::get('metrics', [PlatformController::class, 'metrics']);
         Route::get('announcements', [PlatformController::class, 'announcements']);
         Route::post('announcements', [PlatformController::class, 'publishAnnouncement']);
         Route::get('operators', [PlatformController::class, 'operators']);
@@ -109,6 +110,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('perm:people.manage')->group(function () {
             Route::post('teachers', [TeacherController::class, 'store']);
             Route::post('students/{studentId}/account', [GuardianController::class, 'createAccount'])->whereNumber('studentId');
+            Route::post('students/promote', [\App\Modules\Academics\Http\StudentFileController::class, 'promote']);
+            Route::post('students/{studentId}/anonymize', [\App\Modules\Academics\Http\StudentFileController::class, 'anonymize'])->whereNumber('studentId');
             Route::post('students/{studentId}/guardians', [GuardianController::class, 'store']);
             Route::delete('students/{studentId}/guardians/{guardianId}', [GuardianController::class, 'revoke']);
         });
@@ -151,6 +154,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('school/audit', [SchoolAdminController::class, 'audit'])->middleware('perm:audit.view');
         Route::get('announcements', [SchoolAdminController::class, 'announcements']);
         Route::post('announcements', [SchoolAdminController::class, 'publishAnnouncement'])->middleware('perm:announcements.manage');
+        Route::get('me/student-file', [\App\Modules\Academics\Http\StudentFileController::class, 'mine']);
+        Route::get('students/{studentId}/dossier', [\App\Modules\Academics\Http\StudentFileController::class, 'dossier'])->whereNumber('studentId');
         Route::get('students/{studentId}/notes', [SchoolAdminController::class, 'notes'])->whereNumber('studentId');
         Route::post('students/{studentId}/notes', [SchoolAdminController::class, 'addNote'])->whereNumber('studentId');
 

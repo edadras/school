@@ -44,6 +44,20 @@ class AdminPlatformTest extends TestCase
         $this->as($this->admin, $this->school)->getJson('/api/v1/platform/stats')->assertForbidden();
     }
 
+    public function test_request_metrics_are_recorded_and_only_the_platform_can_read_them(): void
+    {
+        $this->actingAs($this->root);
+        $this->getJson('/api/v1/platform/stats')->assertOk();
+        $this->getJson('/api/v1/platform/stats')->assertOk();
+        $m = $this->getJson('/api/v1/platform/metrics')->assertOk();
+        $last = collect($m->json('hours'))->last();
+        $this->assertGreaterThanOrEqual(2, $last['requests']);
+        $this->assertSame(0, $last['errors_5xx']);
+        $this->assertContains('api/v1/platform/stats', collect($m->json('slowest_routes'))->pluck('route')->all());
+        $this->actingAs($this->schoolAdmin ?? $this->makeMember($this->world['a'] ?? \App\Models\School::first(), 'school_admin'));
+        $this->getJson('/api/v1/platform/metrics')->assertForbidden();
+    }
+
     public function test_platform_announcement_reaches_each_school_admin_and_operators_are_managed(): void
     {
         $this->as($this->root)->postJson('/api/v1/platform/announcements', ['title' => 'نگهداری', 'body' => 'شنبه شب'])->assertCreated()->assertJsonPath('notified', 1);

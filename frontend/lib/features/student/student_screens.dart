@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api.dart';
 import '../../core/format.dart';
@@ -65,7 +66,7 @@ class _GradesState extends ConsumerState<GradesScreen> {
   @override
   Widget build(BuildContext context) {
     return PageBody(children: [
-      const PageHeader('نمرات و کارنامه'),
+      PageHeader('نمرات و کارنامه', actions: [OutlinedButton.icon(key: const Key('open-file'), onPressed: () => context.push(widget.studentId == null ? '/file' : '/file/${widget.studentId}'), icon: const Icon(Icons.folder_shared_outlined), label: const Text('پرونده تحصیلی'))]),
       const SectionTitle('کارنامه‌ها'),
       ReportCardList(studentId: widget.studentId),
       const SectionTitle('نمرات تأییدشده'),

@@ -10,12 +10,13 @@ import '../../design/theme.dart';
 import '../../design/widgets.dart';
 
 final _statsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async => Map<String, dynamic>.from(await ref.read(apiProvider).get('/platform/stats')));
+final _metricsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async => Map<String, dynamic>.from(await ref.read(apiProvider).get('/platform/metrics')));
 final _healthProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async => Map<String, dynamic>.from(await ref.read(apiProvider).get('/platform/health')));
 
 class PlatformDashboard extends ConsumerWidget {
   const PlatformDashboard({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) => PageBody(maxWidth: 1250, onRefresh: () async { ref.invalidate(_statsProvider); ref.invalidate(_healthProvider); }, children: [
+  Widget build(BuildContext context, WidgetRef ref) => PageBody(maxWidth: 1250, onRefresh: () async { ref.invalidate(_statsProvider); ref.invalidate(_healthProvider); ref.invalidate(_metricsProvider); }, children: [
         const PageHeader('نمای کلی سامانه'),
         Async<Map<String, dynamic>>(ref.watch(_statsProvider), onRetry: () => ref.invalidate(_statsProvider), builder: (s) {
           final t = s['totals'] as Map;
@@ -34,6 +35,24 @@ class PlatformDashboard extends ConsumerWidget {
               Expanded(flex: 3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${sc['name']}', style: Theme.of(context).textTheme.titleMedium), Text('${sc['code']} · ${statusName(sc['status'] as String)} · طرح ${sc['plan'] ?? '—'}', style: Theme.of(context).textTheme.bodySmall)])),
               Expanded(flex: 4, child: Wrap(spacing: 14, children: [Text('کاربر: ${faDigits(sc['users'])}'), Text('دانش‌آموز: ${faDigits(sc['students'])}${sc['limits'] != null ? '/${faDigits(sc['limits']['students'])}' : ''}'), Text('کلاس ۳۰ روز: ${faDigits(sc['sessions_30d'])}'), Text('فضا: ${fmtBytes(sc['storage_bytes'] as num)}'), Text('AI: ${faDigits(sc['ai_requests_30d'])}')])),
             ]))),
+          ]);
+        }),
+        const SectionTitle('عملکرد API (۲۴ ساعت اخیر)'),
+        Async<Map<String, dynamic>>(ref.watch(_metricsProvider), onRetry: () => ref.invalidate(_metricsProvider), builder: (m) {
+          final hours = (m['hours'] as List).cast<Map>();
+          final n = hours.fold<int>(0, (a, h) => a + (h['requests'] as int));
+          final e5 = hours.fold<int>(0, (a, h) => a + (h['errors_5xx'] as int));
+          final weighted = hours.fold<double>(0, (a, h) => a + ((h['avg_ms'] as num?) ?? 0) * (h['requests'] as int));
+          final slow = (m['slowest_routes'] as List).cast<Map>().take(5);
+          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Wrap(spacing: 12, runSpacing: 12, children: [
+              SizedBox(width: 250, child: StatCard(label: 'درخواست‌ها', value: faDigits(n), icon: Icons.swap_vert)),
+              SizedBox(width: 250, child: StatCard(label: 'میانگین تأخیر (ms)', value: n == 0 ? '—' : faDigits((weighted / n).round()), icon: Icons.speed)),
+              SizedBox(width: 250, child: StatCard(label: 'خطای سرور (۵xx)', value: faDigits(e5), icon: Icons.error_outline, tone: e5 > 0 ? Tone.danger : Tone.success)),
+              SizedBox(width: 250, child: StatCard(label: 'صف: در انتظار / ناموفق', value: '${faDigits(m['queue_backlog'])} / ${faDigits(m['failed_jobs'])}', icon: Icons.queue, tone: (m['failed_jobs'] as int) > 0 ? Tone.warn : Tone.neutral)),
+            ]),
+            if (slow.isNotEmpty) const SectionTitle('کندترین مسیرها'),
+            for (final r in slow) AppCard(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10), child: Row(children: [Expanded(child: Text('${r['route']}', textDirection: TextDirection.ltr, overflow: TextOverflow.ellipsis)), Text('${faDigits(r['avg_ms'])}ms · ${faDigits(r['requests'])} درخواست')])),
           ]);
         }),
         const SectionTitle('سلامت سرویس‌ها'),

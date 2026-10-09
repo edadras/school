@@ -93,7 +93,17 @@ class _EnrollmentsState extends ConsumerState<_Enrollments> {
   final _key = GlobalKey<PagedListState>();
   @override
   Widget build(BuildContext context) => PageBody(children: [
-        PageHeader('ثبت‌نام، انتقال و ارتقا', actions: [FilledButton.icon(key: const Key('add-enrollment'), onPressed: () async {
+        PageHeader('ثبت‌نام، انتقال و ارتقا', actions: [OutlinedButton.icon(key: const Key('promote-class'), onPressed: () async {
+          final ok = await showForm(context, title: 'ارتقای کلاس به سال تحصیلی بعد', submitLabel: 'ارتقا', fields: const [
+            FieldSpec('from_section_id', 'کلاس مبدأ', type: FieldType.dropdown, required: true, optionsFrom: '/academics/sections', optionLabel: _sec),
+            FieldSpec('to_section_id', 'کلاس مقصد (سال تحصیلی بعد)', type: FieldType.dropdown, required: true, optionsFrom: '/academics/sections', optionLabel: _sec),
+            FieldSpec('only_passed', 'فقط دانش‌آموزان قبول‌شده (طبق کارنامهٔ صادرشده)', type: FieldType.toggle, initial: true),
+          ], submit: (v) async {
+            final r = await ref.read(apiProvider).post('/students/promote', data: v);
+            if (mounted) toast(context, '${faDigits(r['promoted'])} دانش‌آموز ارتقا یافت؛ ${faDigits((r['skipped'] as List).length)} مورد رد شد.');
+          });
+          if (ok) _key.currentState?.reload();
+        }, icon: const Icon(Icons.upgrade), label: const Text('ارتقای کلاس')), FilledButton.icon(key: const Key('add-enrollment'), onPressed: () async {
           final ok = await showForm(context, title: 'ثبت‌نام / انتقال به کلاس', fields: const [
             FieldSpec('student_id', 'دانش‌آموز', type: FieldType.dropdown, required: true, optionsFrom: '/academics/students', optionLabel: _studentLabel),
             FieldSpec('section_id', 'کلاس', type: FieldType.dropdown, required: true, optionsFrom: '/academics/sections', optionLabel: _sec),

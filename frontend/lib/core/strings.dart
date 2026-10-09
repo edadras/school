@@ -4,6 +4,8 @@ const Map<String, Map<String, String>> _tables = {
   'fa': {
     'role.school_admin': 'مدیر مدرسه', 'role.deputy': 'معاون آموزشی', 'role.teacher': 'معلم', 'role.student': 'دانش‌آموز', 'role.guardian': 'والد',
     'role.super_admin': 'مدیر کل سامانه', 'role.support': 'پشتیبان فنی',
+    'enroll.active': 'فعال', 'enroll.promoted': 'ارتقا یافته', 'enroll.transferred': 'منتقل‌شده', 'enroll.withdrawn': 'انصراف',
+    'note.discipline': 'انضباطی', 'note.praise': 'تشویق', 'note.counselling': 'مشاوره', 'note.strength': 'نقطهٔ قوت', 'note.need': 'نیازمند تقویت',
     'status.pending': 'در انتظار بررسی', 'status.active': 'فعال', 'status.rejected': 'ردشده', 'status.suspended': 'تعلیق', 'status.needs_changes': 'نیازمند اصلاح',
     'status.approved': 'تأییدشده', 'status.draft': 'پیش‌نویس', 'status.published': 'منتشرشده', 'status.closed': 'بسته', 'status.archived': 'بایگانی',
     'status.scheduled': 'برنامه‌ریزی‌شده', 'status.live': 'در حال برگزاری', 'status.ended': 'پایان‌یافته', 'status.not_held': 'برگزار نشد', 'status.technical_issue': 'مشکل فنی',

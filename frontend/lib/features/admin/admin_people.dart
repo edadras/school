@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/api.dart';
@@ -36,6 +37,17 @@ class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProv
         Expanded(child: TabBarView(controller: _tabs, children: [_studentsTab(), _teachersTab(), _staffTab(), _importTab()])),
       ]);
 
+  Future<void> _anonymize(Map<String, dynamic> s) async {
+    if (!await confirm(context, 'اطلاعات هویتی «${s['first_name']} ${s['last_name']}» برای همیشه حذف می‌شود (نام، تماس، حساب ورود، پیوند والدین). نمرات و سوابق بدون هویت نگه‌داری می‌شوند. ادامه می‌دهید؟', ok: 'ادامه', danger: true)) return;
+    if (!mounted) return;
+    final code = await promptText(context, 'برای تأیید، کد دانش‌آموزی (${s['student_code']}) را وارد کنید', label: 'کد دانش‌آموزی', maxLines: 1);
+    if (code == null || !mounted) return;
+    try {
+      await ref.read(apiProvider).post('/students/${s['id']}/anonymize', data: {'confirm_code': code.trim()});
+      if (mounted) { toast(context, 'اطلاعات هویتی حذف شد.'); _students.currentState?.reload(); }
+    } on ApiException catch (e) { if (mounted) toast(context, e.readable, error: true); }
+  }
+
   Widget _studentsTab() => PageBody(children: [
         PageHeader('دانش‌آموزان', actions: [FilledButton.icon(key: const Key('add-student'), onPressed: _addStudent, icon: const Icon(Icons.person_add_alt_1), label: const Text('دانش‌آموز جدید'))]),
         Padding(padding: const EdgeInsets.only(bottom: 12), child: SearchField(onChanged: (v) => setState(() => _q = v), hint: 'نام یا کد دانش‌آموزی')),
@@ -43,8 +55,10 @@ class _AdminPeopleState extends ConsumerState<AdminPeople> with SingleTickerProv
               const CircleAvatar(backgroundColor: Palette.brandSoft, child: Icon(Icons.person, color: Palette.brand)), const SizedBox(width: 12),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${s['first_name']} ${s['last_name']}', style: Theme.of(c).textTheme.titleMedium), Text('کد ${faDigits(s['student_code'])}  ·  ${s['status']}', style: Theme.of(c).textTheme.bodySmall)])),
               if (s['user_id'] == null) IconButton(tooltip: 'ساخت حساب ورود برای دانش‌آموز', icon: const Icon(Icons.key_outlined), onPressed: () => _account(s)),
+              IconButton(tooltip: 'پرونده تحصیلی', icon: const Icon(Icons.folder_shared_outlined), onPressed: () => context.push('/file/${s['id']}')),
               IconButton(tooltip: 'ثبت والد/سرپرست', icon: const Icon(Icons.family_restroom_outlined), onPressed: () => _addGuardian(s)),
               IconButton(tooltip: 'ویرایش', icon: const Icon(Icons.edit_outlined), onPressed: () => _editStudent(s)),
+              if (s['status'] != 'archived') IconButton(tooltip: 'حذف اطلاعات هویتی (ناشناس‌سازی)', icon: const Icon(Icons.person_off_outlined, color: Palette.danger), onPressed: () => _anonymize(s)),
             ]))),
       ]);
 

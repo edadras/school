@@ -19,6 +19,7 @@ import 'features/platform/platform_screens.dart';
 import 'features/shell.dart';
 import 'features/student/assignments.dart';
 import 'features/student/exams.dart';
+import 'features/common/student_file.dart';
 import 'features/student/student_screens.dart';
 import 'features/teacher/teacher_assignments.dart';
 import 'features/teacher/teacher_exams.dart';
@@ -55,7 +56,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (panel == null) return '/login';
       final base = basePath(panel);
       if (loc == '/' || _publicPaths.contains(loc) || loc == '/choose-school' || loc == '/pending') return base;
-      const shared = ['/notifications', '/profile', '/live/', '/exam/', '/assignment/', '/report-card/', '/chat/'];
+      const shared = ['/notifications', '/profile', '/live/', '/exam/', '/assignment/', '/report-card/', '/chat/', '/file'];
       if (shared.any(loc.startsWith)) return null;
       if (!loc.startsWith(base)) return base;
       return null;
@@ -74,6 +75,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/exam/:id', builder: (c, s) => ExamTakeScreen(attemptId: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/assignment/:id', builder: (c, s) => AssignmentDetail(id: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/report-card/:id', builder: (c, s) => ReportCardViewer(id: int.parse(s.pathParameters['id']!))),
+      GoRoute(path: '/file', builder: (c, s) => const StudentFileScreen()),
+      GoRoute(path: '/file/:id', builder: (c, s) => StudentFileScreen(studentId: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/chat/:id', builder: (c, s) => ChatPage(id: int.parse(s.pathParameters['id']!))),
 
       shell(Panel.platform, [

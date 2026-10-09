@@ -19,4 +19,9 @@ class Section extends Model
         return $this->belongsTo(Grade::class);
     }
 
+    public function year()
+    {
+        return $this->belongsTo(AcademicYear::class, 'academic_year_id');
+    }
+
 }

@@ -130,6 +130,31 @@ class PlatformController extends Controller
         return response()->json(['data' => $u->only(['id', 'name', 'platform_role', 'status'])]);
     }
 
+    /** Latency/error counters recorded by RecordMetrics (last N hours, default 24). */
+    public function metrics(Request $request): JsonResponse
+    {
+        $hours = min(max($request->integer('hours', 24), 1), 48);
+        $series = [];
+        $routes = [];
+        for ($i = $hours - 1; $i >= 0; $i--) {
+            $h = now()->subHours($i)->format('YmdH');
+            $n = (int) \Cache::get("m:h:$h:n", 0);
+            $series[] = ['hour' => $h, 'requests' => $n, 'errors_5xx' => (int) \Cache::get("m:h:$h:e5", 0), 'errors_4xx' => (int) \Cache::get("m:h:$h:e4", 0),
+                'avg_ms' => $n ? round(\Cache::get("m:h:$h:ms", 0) / $n, 1) : null,
+                'slow' => collect(\App\Http\Middleware\RecordMetrics::BUCKETS)->mapWithKeys(fn ($b) => ["gt_{$b}ms" => (int) \Cache::get("m:h:$h:gt$b", 0)])];
+            foreach (\Cache::get("m:routes:$h", []) as $r) {
+                $rn = (int) \Cache::get("m:r:$h:$r:n", 0);
+                $routes[$r]['n'] = ($routes[$r]['n'] ?? 0) + $rn;
+                $routes[$r]['ms'] = ($routes[$r]['ms'] ?? 0) + (int) \Cache::get("m:r:$h:$r:ms", 0);
+                $routes[$r]['e5'] = ($routes[$r]['e5'] ?? 0) + (int) \Cache::get("m:r:$h:$r:e5", 0);
+            }
+        }
+        $top = collect($routes)->map(fn ($v, $k) => ['route' => $k, 'requests' => $v['n'], 'avg_ms' => $v['n'] ? round($v['ms'] / $v['n'], 1) : null, 'errors_5xx' => $v['e5']])
+            ->sortByDesc('avg_ms')->take(15)->values();
+
+        return response()->json(['hours' => $series, 'slowest_routes' => $top, 'queue_backlog' => (int) \Illuminate\Support\Facades\DB::table('jobs')->count(), 'failed_jobs' => (int) \Illuminate\Support\Facades\DB::table('failed_jobs')->count()]);
+    }
+
     // ---- platform settings
     public function settings(): JsonResponse
     {
