@@ -33,8 +33,8 @@ class AnalyticsController extends Controller
 
         return response()->json([
             'counts' => ['students' => Student::where('status', 'active')->count(), 'teachers' => Teacher::count(), 'sections' => Section::count()],
-            'attendance' => ['by_status' => $att, 'present_rate' => round(($att['present'] ?? 0) / $attTotal * 100, 1), 'absent_rate' => round(($att['absent'] ?? 0) / $attTotal * 100, 1)],
-            'sessions' => ['by_status' => $sess, 'held_rate' => $sess->sum() ? round((($sess['ended'] ?? 0) + ($sess['live'] ?? 0)) / $sess->sum() * 100, 1) : null],
+            'attendance' => ['by_status' => (object) collect($att)->all(), 'present_rate' => round(($att['present'] ?? 0) / $attTotal * 100, 1), 'absent_rate' => round(($att['absent'] ?? 0) / $attTotal * 100, 1)],
+            'sessions' => ['by_status' => (object) collect($sess)->all(), 'held_rate' => $sess->sum() ? round((($sess['ended'] ?? 0) + ($sess['live'] ?? 0)) / $sess->sum() * 100, 1) : null],
             'assignments' => ['published' => $assign, 'submission_rate' => $expected ? round($subs / $expected * 100, 1) : null],
             'exams' => ['graded_attempts' => ExamAttempt::where('status', 'graded')->count(), 'pending_manual' => ExamAttempt::where('status', 'submitted')->count()],
         ]);

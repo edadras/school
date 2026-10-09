@@ -153,7 +153,7 @@ class SessionController extends Controller
             ->selectRaw('status, count(*) c')->groupBy('status')->pluck('c', 'status');
         $issues = SessionIssue::whereDate('created_at', '>=', $from)->selectRaw('type, count(*) c')->groupBy('type')->pluck('c', 'type');
 
-        return response()->json(['by_status' => $rows, 'issues' => $issues, 'live_now' => LessonSession::where('status', 'live')->count()]);
+        return response()->json(['by_status' => (object) collect($rows)->all(), 'issues' => (object) collect($issues)->all(), 'live_now' => LessonSession::where('status', 'live')->count()]);
     }
 
     /** Recording is opt-in per school policy AND per session; participants are told via the join payload. */

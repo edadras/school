@@ -37,7 +37,7 @@ class SchoolAdminController extends Controller
         $s = School::with('subscription')->find(app(CurrentSchool::class)->id());
 
         return response()->json(['data' => $s->only(['id', 'code', 'name', 'logo_path', 'phone', 'email', 'address', 'city', 'timezone', 'calendar', 'locale', 'status']) + ['subscription' => $s->subscription],
-            'settings' => $this->settings->all()]);
+            'settings' => (object) $this->settings->all()]);
     }
 
     public function updateProfile(Request $request): JsonResponse
@@ -66,7 +66,7 @@ class SchoolAdminController extends Controller
         }
         Audit::record('school.settings_changed', null, null, $changed);
 
-        return response()->json(['settings' => $this->settings->all()]);
+        return response()->json(['settings' => (object) $this->settings->all()]);
     }
 
     public function audit(Request $request): JsonResponse

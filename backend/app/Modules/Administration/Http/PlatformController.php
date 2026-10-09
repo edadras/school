@@ -36,7 +36,7 @@ class PlatformController extends Controller
         $subs = DB::table('school_subscriptions')->where('status', 'active')->get()->keyBy('school_id');
 
         return response()->json([
-            'totals' => ['schools' => $schools->count(), 'by_status' => $schools->groupBy('status')->map->count(), 'users' => (int) $users->sum(), 'students' => (int) $students->sum(),
+            'totals' => ['schools' => $schools->count(), 'by_status' => (object) $schools->groupBy('status')->map->count()->all(), 'users' => (int) $users->sum(), 'students' => (int) $students->sum(),
                 'live_sessions' => (int) $live->sum(), 'storage_bytes' => (int) $storage->sum()],
             'schools' => $schools->map(fn ($s) => $s->only(['id', 'code', 'name', 'status']) + [
                 'users' => (int) ($users[$s->id] ?? 0), 'students' => (int) ($students[$s->id] ?? 0), 'live_sessions' => (int) ($live[$s->id] ?? 0), 'sessions_30d' => (int) ($sessions30[$s->id] ?? 0),
@@ -133,7 +133,7 @@ class PlatformController extends Controller
     // ---- platform settings
     public function settings(): JsonResponse
     {
-        return response()->json(['data' => PlatformSetting::all()->mapWithKeys(fn ($s) => [$s->key => $s->value])]);
+        return response()->json(['data' => (object) PlatformSetting::all()->mapWithKeys(fn ($s) => [$s->key => $s->value])->all()]);
     }
 
     public function updateSettings(Request $request): JsonResponse

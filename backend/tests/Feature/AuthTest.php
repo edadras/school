@@ -68,4 +68,16 @@ class AuthTest extends TestCase
         $this->assertSame('nosniff', $r->headers->get('X-Content-Type-Options'));
         $this->assertStringContainsString('no-store', $r->headers->get('Cache-Control'));
     }
+
+    public function test_empty_maps_are_json_objects_not_lists_so_clients_can_rely_on_the_shape(): void
+    {
+        $this->seedRbac();
+        $school = $this->makeSchool('shape');
+        $admin = $this->makeMember($school, 'school_admin');
+        $raw = $this->as($admin, $school)->getJson('/api/v1/school/profile')->getContent();
+        $this->assertStringContainsString('"settings":{}', $raw);
+        $raw = $this->as($admin, $school)->getJson('/api/v1/sessions/report')->getContent();
+        $this->assertStringContainsString('"issues":{}', $raw);
+        $this->assertStringContainsString('"by_status":{}', $raw);
+    }
 }
